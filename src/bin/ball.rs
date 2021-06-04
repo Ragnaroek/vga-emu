@@ -16,7 +16,10 @@ const BALL_OFFSET: usize = BLANK_OFFSET + (BALL_WIDTH * BALL_HEIGHT); //start of
 const NUM_BALLS: usize = 4;
 
 pub fn main() {
-    let mut vga = vga::new();
+    let mut vga = vga::new(0x10);
+
+    draw_border(&mut vga, PAGE0_OFFSET);
+
     vga.set_sc_data(SCReg::MapMask, 0x01);
     vga.write_mem_chunk(
         BALL_OFFSET,
@@ -94,12 +97,34 @@ pub fn main() {
         vga.write_mem(BLANK_OFFSET + i, 0x00);
     }
 
+    //enable write mode 1
     let mut gc_mode = vga.get_gc_data(GCReg::GraphicsMode);
     gc_mode &= 0xFC;
     gc_mode |= 0x01;
     vga.set_gc_data(GCReg::GraphicsMode, gc_mode);
 
+    //set scan line width (in bytes)
     vga.set_crt_data(CRTReg::Offset, (LOGICAL_SCREEN_WIDTH / 2) as u8);
 
-    screen::start_debug_planar_mode(Arc::new(vga));
+    screen::start(Arc::new(vga));
+}
+
+fn draw_border(vga: &mut vga::VGA, offset: usize) {
+    let mut di = offset;
+    for _ in 0..(LOGICAL_SCREEN_HEIGHT / 16) {
+        vga.set_sc_data(SCReg::MapMask, 0x0c); //red channel
+        draw_border_block(vga, di);
+        di += LOGICAL_SCREEN_WIDTH * 8;
+        vga.set_sc_data(SCReg::MapMask, 0x0e); //yellow channel
+        draw_border_block(vga, di);
+        di += LOGICAL_SCREEN_WIDTH * 8;
+    }
+}
+
+fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
+    let mut di = offset;
+    for _ in 0..8 {
+        vga.write_mem(di, 0xff);
+        di += LOGICAL_SCREEN_WIDTH // - 1;
+    }
 }
