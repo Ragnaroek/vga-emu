@@ -19,9 +19,10 @@ pub fn start(vga: Arc<VGA>) {
 }
 
 //Shows the full content of the VGA buffer as one big screen (for debugging) for
-//the planar modes
-pub fn start_debug_planar_mode(vga: Arc<VGA>) {
-    start_video(vga, 640, 820)
+//the planar modes. width and height depends on your virtual screen size (640x819 if
+//you did not change the default settings)
+pub fn start_debug_planar_mode(vga: Arc<VGA>, w: u32, h: u32) {
+    start_video(vga, w, h)
 }
 
 fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
@@ -53,7 +54,7 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
                 let v3 = vga.mem[3][mem_offset + mem_byte];
 
                 for b in 0..8 {
-                    let bx = (1 << b) as u8;
+                    let bx = (1 << (7 - b)) as u8;
                     let mut c = bit_x(v0, bx, 0);
                     c |= bit_x(v1, bx, 1);
                     c |= bit_x(v2, bx, 2);
