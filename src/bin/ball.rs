@@ -1,5 +1,6 @@
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use std::sync::Arc;
+use std::sync::{RwLock,Arc};
+use std::thread;
 use vga::screen;
 use vga::{CRTReg, GCReg, SCReg};
 
@@ -112,8 +113,15 @@ pub fn main() {
     draw_ball(&mut vga, BALL_OFFSET, 40, 110);
     draw_ball(&mut vga, BALL_OFFSET, 70, 300);
 
-    screen::start_debug_planar_mode(Arc::new(vga), 672, 780);
-    //screen::start(Arc::new(vga));
+    let vga_lock = Arc::new(RwLock::new(vga));
+    let vga_t = vga_lock.clone();
+
+    thread::spawn(move || {
+        let mut vga = vga_t.write().unwrap();
+        draw_ball(&mut vga, BALL_OFFSET, 20, 50);
+    });
+
+    screen::start_debug_planar_mode(vga_lock, 672, 780);
 }
 
 fn draw_ball(vga: &mut vga::VGA, src_offset: usize, x: usize, y: usize) {

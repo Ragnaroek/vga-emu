@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc,RwLock};
 use std::time::Duration;
 
 use sdl2::event::Event;
@@ -10,8 +10,8 @@ use super::CRTReg;
 use super::VGA;
 
 //Shows the screen according to the VGA video mode
-pub fn start(vga: Arc<VGA>) {
-    if vga.video_mode == 0x10 {
+pub fn start(vga: Arc<RwLock<VGA>>) {
+    if vga.read().unwrap().video_mode == 0x10 {
         start_video(vga, 640, 350)
     } else {
         panic!("only video mode 0x10 implemented")
@@ -21,11 +21,11 @@ pub fn start(vga: Arc<VGA>) {
 //Shows the full content of the VGA buffer as one big screen (for debugging) for
 //the planar modes. width and height depends on your virtual screen size (640x819 if
 //you did not change the default settings)
-pub fn start_debug_planar_mode(vga: Arc<VGA>, w: u32, h: u32) {
+pub fn start_debug_planar_mode(vga: Arc<RwLock<VGA>>, w: u32, h: u32) {
     start_video(vga, w, h)
 }
 
-fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
+fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -37,7 +37,7 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
     let mut canvas = window.into_canvas().build().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
 
-    let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
+    let offset_delta = vga_lock.read().unwrap().get_crt_data(CRTReg::Offset) as usize;
     if offset_delta <= 0 {
         panic!("illegal CRT offset: {}", offset_delta);
     }
@@ -48,6 +48,7 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
         let mut y: usize = 0;
         for _ in 0..(h as usize) {
             for mem_byte in 0..((w / 8) as usize) {
+                let vga = vga_lock.read().unwrap();
                 let v0 = vga.mem[0][mem_offset + mem_byte];
                 let v1 = vga.mem[1][mem_offset + mem_byte];
                 let v2 = vga.mem[2][mem_offset + mem_byte];
