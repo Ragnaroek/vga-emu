@@ -82,7 +82,7 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
         }
 
         canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 120));
     }
 
     fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
