@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
 use vga::screen;
-use vga::{CRTReg, GCReg, SCReg};
+use vga::{CRTReg, GCReg, SCReg, GeneralReg};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -16,6 +16,9 @@ const BALL_HEIGHT: usize = 24; //height of ball in scan lines
 const BLANK_OFFSET: usize = PAGE1_OFFSET * 2; //start of blank image in VGA memory
 const BALL_OFFSET: usize = BLANK_OFFSET + (BALL_WIDTH * BALL_HEIGHT); //start offset of ball image in VGA memory
 const NUM_BALLS: usize = 4;
+
+const VSYNC_MASK : u8 = 0x08;
+const DE_MASK : u8 = 0x01;
 
 const BALL_0_CONTROL: [i16; 13] = [10, 1, 4, 10, -1, 4, 10, -1, -4, 10, 1, -4, 0];
 const BALL_1_CONTORL: [i16; 13] = [12, -1, 1, 28, -1, -1, 12, 1, -1, 28, 1, 1, 0];
@@ -163,6 +166,11 @@ pub fn main() {
                 }
             }
 
+            //adjust_panning()
+            wait_display_enable(&vga_t);
+            //TODO Flip to new page
+            wait_vsync(&vga_t);
+
             ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));
         }
     });
@@ -234,5 +242,25 @@ fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
     for _ in 0..8 {
         vga.write_mem(di, 0xff);
         di += LOGICAL_SCREEN_WIDTH;
+    }
+}
+
+fn wait_display_enable(vga_t: &Arc<RwLock<vga::VGA>>) {
+    loop {
+        let vga = vga_t.read().unwrap();
+        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if in1 & DE_MASK == 0 {
+            break;
+        }
+    } 
+}
+
+fn wait_vsync(vga_t: &Arc<RwLock<vga::VGA>>) {
+    loop {
+        let vga = vga_t.read().unwrap();
+        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if in1 & VSYNC_MASK != 0 {
+            break;
+        }
     }
 }
