@@ -4,7 +4,7 @@ use vga::{GCReg, SCReg};
 
 #[test]
 fn test_write_read_mem_mode_0() {
-    let mut vga = vga::new(0x10);
+    let vga = vga::new(0x10);
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -28,7 +28,7 @@ fn test_write_read_mem_mode_0() {
 
 #[test]
 fn test_write_read_mem_mode_1() {
-    let mut vga = vga::new(0x10);
+    let vga = vga::new(0x10);
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {

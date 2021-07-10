@@ -1,21 +1,21 @@
-use std::sync::{Arc,RwLock};
-use std::time::{Duration, Instant};
+use std::sync::Arc;
 use std::thread::sleep;
+use std::time::{Duration, Instant};
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::pixels::Color;
-use sdl2::rect::Point;
+use sdl2::pixels::{Color, PixelFormatEnum};
+use sdl2::rect::{Rect};
 
-use super::{VGA, CRTReg, GeneralReg};
+use super::{CRTReg, GeneralReg, VGA};
 
-const CLEAR_VR_MASK : u8 = 0b11110111;
-const CLEAR_DE_MASK : u8 = 1;
-const TARGET_FRAME_RATE_MICRO: u128 = 1000_000/60;
+const CLEAR_VR_MASK: u8 = 0b11110111;
+const CLEAR_DE_MASK: u8 = 1;
+const TARGET_FRAME_RATE_MICRO: u128 = 1000_000 / 60;
 
 //Shows the screen according to the VGA video mode
-pub fn start(vga: Arc<RwLock<VGA>>) {
-    if vga.read().unwrap().video_mode == 0x10 {
+pub fn start(vga: Arc<VGA>) {
+    if vga.get_video_mode() == 0x10 {
         start_video(vga, 640, 350)
     } else {
         panic!("only video mode 0x10 implemented")
@@ -25,11 +25,11 @@ pub fn start(vga: Arc<RwLock<VGA>>) {
 //Shows the full content of the VGA buffer as one big screen (for debugging) for
 //the planar modes. width and height depends on your virtual screen size (640x819 if
 //you did not change the default settings)
-pub fn start_debug_planar_mode(vga: Arc<RwLock<VGA>>, w: u32, h: u32) {
+pub fn start_debug_planar_mode(vga: Arc<VGA>, w: u32, h: u32) {
     start_video(vga, w, h)
 }
 
-fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
+fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -40,8 +40,12 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
         .unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     let mut event_pump = sdl_context.event_pump().unwrap();
+    let texture_creator = canvas.texture_creator();
+    let mut texture = texture_creator
+        .create_texture_streaming(PixelFormatEnum::RGB24, w, h)
+        .unwrap();
 
-    let offset_delta = vga_lock.read().unwrap().get_crt_data(CRTReg::Offset) as usize;
+    let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
     if offset_delta <= 0 {
         panic!("illegal CRT offset: {}", offset_delta);
     }
@@ -52,40 +56,44 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
         let mut y: usize = 0;
         let frame_start = Instant::now();
         //set VR to 0
-        set_vr(&vga_lock, false);
-        for _ in 0..(h as usize) {
-            //set DE to 0
-            let h_start = Instant::now();
-            set_de(&vga_lock, false);
-            for mem_byte in 0..((w / 8) as usize) {
-                let vga = vga_lock.read().unwrap();
-                let v0 = vga.mem[0][mem_offset + mem_byte];
-                let v1 = vga.mem[1][mem_offset + mem_byte];
-                let v2 = vga.mem[2][mem_offset + mem_byte];
-                let v3 = vga.mem[3][mem_offset + mem_byte];
+        set_vr(&vga, false);
+        texture
+            .with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                for _ in 0..(h as usize) {
+                    //set DE to 0
+                    set_de(&vga, false);
 
-                for b in 0..8 {
-                    let bx = (1 << (7 - b)) as u8;
-                    let mut c = bit_x(v0, bx, 0);
-                    c |= bit_x(v1, bx, 1);
-                    c |= bit_x(v2, bx, 2);
-                    c |= bit_x(v3, bx, 3);
-                    canvas.set_draw_color(default_color(c));
-                    canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
-                    x += 1;
+                    for mem_byte in 0..((w / 8) as usize) {
+                        let v0 = vga.raw_read_mem(0, mem_offset + mem_byte);
+                        let v1 = vga.raw_read_mem(1, mem_offset + mem_byte);
+                        let v2 = vga.raw_read_mem(2, mem_offset + mem_byte);
+                        let v3 = vga.raw_read_mem(3, mem_offset + mem_byte);
+
+                        for b in 0..8 {
+                            let bx = (1 << (7 - b)) as u8;
+                            let mut c = bit_x(v0, bx, 0);
+                            c |= bit_x(v1, bx, 1);
+                            c |= bit_x(v2, bx, 2);
+                            c |= bit_x(v3, bx, 3);
+
+                            let color = default_color(c);
+                            let offset = y * pitch + x * 3;
+                            buffer[offset] = color.r;
+                            buffer[offset + 1] = color.g;
+                            buffer[offset + 2] = color.b;
+                            x += 1;
+                        }
+                    }
+                    x = 0;
+                    y += 1;
+                    mem_offset += offset_delta * 2;
+
+                    set_de(&vga, true);
                 }
-            }
-            x = 0;
-            y += 1;
-            mem_offset += offset_delta * 2;
-
-            set_de(&vga_lock, true);
-            let h_elapsed = h_start.elapsed().as_micros();
-            if h_elapsed < 32 {
-                //we are currently nowhere near being that fast in the simulation
-                sleep(Duration::from_micros(32 - h_elapsed as u64));
-            } 
-        }
+            })
+            .unwrap();
+        canvas.copy(&texture, None, Some(Rect::new(0, 0, w, h))).unwrap();
+        canvas.present();
 
         for event in event_pump.poll_iter() {
             match event {
@@ -98,15 +106,19 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
             }
         }
 
-        canvas.present();
-
-        set_de(&vga_lock, true);
-        set_vr(&vga_lock, true);
+        set_de(&vga, true);
+        set_vr(&vga, true);
         let v_elapsed = frame_start.elapsed().as_micros();
         if v_elapsed < TARGET_FRAME_RATE_MICRO {
-            sleep(Duration::from_micros((TARGET_FRAME_RATE_MICRO -  v_elapsed) as u64));
+            sleep(Duration::from_micros(
+                (TARGET_FRAME_RATE_MICRO - v_elapsed) as u64,
+            ));
         } else {
-            println!("frame rate miss: {} > {}", v_elapsed, TARGET_FRAME_RATE_MICRO);
+            //TODO optionally debug print this to the screen
+            println!(
+                "frame rate miss: {} > {}",
+                v_elapsed, TARGET_FRAME_RATE_MICRO
+            );
         }
     }
 
@@ -119,22 +131,20 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
     }
 
     //vertical retrace
-    fn set_vr(vga_lock: &Arc<RwLock<VGA>>, set: bool) {
-        let mut vga = vga_lock.write().unwrap();
+    fn set_vr(vga: &VGA, set: bool) {
         let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
         if set {
-            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK );
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
         } else {
             vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
         }
     }
 
     //display enable NOT
-    fn set_de(vga_lock: &Arc<RwLock<VGA>>, set: bool) {
-        let mut vga = vga_lock.write().unwrap();
+    fn set_de(vga: &VGA, set: bool) {
         let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
         if set {
-            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK );
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
         } else {
             vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
         }
