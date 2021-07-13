@@ -174,7 +174,7 @@ pub fn main() {
         }
     });
 
-    screen::start_debug_planar_mode(vga_m, 672, 780);
+    screen::start_debug_planar_mode(vga_m, 672, 780, screen::Options{show_frame_rate: true}).unwrap();
 }
 
 fn draw_ball(vga: &vga::VGA, src_offset: usize, x: usize, y: usize) {
