@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration};
 use vga::screen;
-use vga::{CRTReg, GCReg, GeneralReg, SCReg};
+use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -29,6 +29,28 @@ const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
     BALL_2_CONTORL,
     BALL_3_CONTORL,
 ];
+const PANNING_CONTROL_STRING : [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
+
+struct PanningState {
+    hpan: i16,
+    panning_rep: i16,
+    panning_x_inc: i16,
+    panning_y_inc: i16,
+    panning_start_offset: usize,
+    panning_control: usize,
+}
+
+fn initial_panning_state() -> PanningState {
+    PanningState {
+        hpan: 0,
+        panning_rep: 1,
+        panning_x_inc: 1,
+        panning_y_inc: 1,
+        panning_start_offset: 0,
+        panning_control: 0,
+    }
+}
+
 
 pub fn main() {
     let mut vga = vga::new(0x10);
@@ -132,9 +154,11 @@ pub fn main() {
         let mut ball_y_inc = [8, 8, 8, 8];
         let mut ball_rep = [1, 1, 1, 1];
         let mut ball_control = [0, 0, 0, 0];
-
+        
         let mut current_page = PAGE1;
         let mut current_page_offset = PAGE1_OFFSET;
+
+        let mut panning_state = initial_panning_state();
 
         loop {
             for bx in (0..NUM_BALLS).rev() {
@@ -176,20 +200,23 @@ pub fn main() {
                     ball_y[bx],
                 );
             }
-            //TODO adjust_panning()
-            wait_display_enable(&vga_t);
-            
-            // Flip to new page by setting new start adress
-            let addr_parts = current_page_offset.to_be_bytes();
-            vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
-            vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
+
+            adjust_panning(&mut panning_state);
             
             //The animation update loop is much, much faster than the frame rate. To not waste needless cycles in the
             //wait_vsync spinlock we sleep a while and simulate a much slower processor.
-            thread::sleep(Duration::from_micros((screen::TARGET_FRAME_RATE_MICRO - screen::TARGET_FRAME_RATE_MICRO / 10) as u64));
+            thread::sleep(Duration::from_micros((screen::TARGET_FRAME_RATE_MICRO - screen::TARGET_FRAME_RATE_MICRO / 100) as u64));
+            
+            wait_display_enable(&vga_t);
+
+            // Flip to new page by setting new start adress
+            let addr_parts = (current_page_offset + panning_state.panning_start_offset).to_le_bytes();
+            vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
+            vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
+            
             wait_vsync(&vga_t);
 
-            //TODO set panning here
+            vga_t.set_attribute_reg(AttributeReg::HorizontalPixelPanning, panning_state.hpan as u8);
             
             //flip pages for next loop
             current_page ^= 1;
@@ -276,6 +303,46 @@ fn draw_border_block(vga: &vga::VGA, offset: usize) {
     for _ in 0..8 {
         vga.write_mem(di, 0xff);
         di += LOGICAL_SCREEN_WIDTH;
+    }
+}
+
+fn adjust_panning(state : &mut PanningState) {
+    state.panning_rep -= 1;
+    if state.panning_rep <= 0 {
+        let ax = PANNING_CONTROL_STRING[state.panning_control];
+        if ax == 0 {//end of control string
+            state.panning_control = 0;
+        }
+        state.panning_rep = PANNING_CONTROL_STRING[state.panning_control];
+        state.panning_x_inc = PANNING_CONTROL_STRING[state.panning_control+1];
+        state.panning_y_inc = PANNING_CONTROL_STRING[state.panning_control+2];
+        state.panning_control += 3;        
+    }
+
+    //horizontal pan
+    if state.panning_x_inc < 0 {
+        //pan left
+        state.hpan -= 1;
+        if state.hpan < 0 {
+            state.hpan = 7;
+            state.panning_start_offset -= 1;
+        }
+    } else if state.panning_x_inc > 0 {
+        //pan right
+        state.hpan += 1;
+        if state.hpan >= 8 {
+            state.hpan = 0;
+            state.panning_start_offset += 1;
+        }
+    }
+
+    //vertical pan
+    if state.panning_y_inc < 0 {
+        //pan up
+        state.panning_start_offset -= LOGICAL_SCREEN_WIDTH;
+    } else if state.panning_y_inc > 0 {
+        //pan down
+        state.panning_start_offset += LOGICAL_SCREEN_WIDTH;
     }
 }
 

@@ -46,6 +46,3 @@ fn test_write_read_mem_mode_1() {
         assert_eq!(vga.read_mem(888), 66);
     }
 }
-
-#[test]
-fn test_read_mem() {}

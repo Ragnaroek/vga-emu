@@ -11,7 +11,8 @@ pub struct VGA {
     crt_reg: Vec<AtomicU8>,
     latch_reg: Vec<AtomicU8>,
     general_reg: Vec<AtomicU8>,
-    pub mem: Vec<Vec<AtomicU8>>,
+    attribute_reg: Vec<AtomicU8>,
+    mem: Vec<Vec<AtomicU8>>,
 }
 
 pub fn new(video_mode: u8) -> VGA {
@@ -32,6 +33,7 @@ pub fn new(video_mode: u8) -> VGA {
         crt_reg,
         latch_reg: init_atomic_u8_vec(4),
         general_reg: init_atomic_u8_vec(4),
+        attribute_reg: init_atomic_u8_vec(21),
         mem,
     }
 }
@@ -66,6 +68,7 @@ pub enum GCReg {
     BitMask = 0x8,
 }
 
+//CRT Controller Registers
 pub enum CRTReg {
     HorizontalTotal = 0x00,
     EndHorizontalDisplay = 0x01,
@@ -101,6 +104,30 @@ pub enum GeneralReg {
     InputStatus1 = 0x03,
 }
 
+pub enum AttributeReg {
+    Palette0 = 0x00,
+    Palette1 = 0x01,
+    Palette2 = 0x02,
+    Palette3 = 0x03,
+    Palette4 = 0x04,
+    Palette5 = 0x05,
+    Palette6 = 0x06,
+    Palette7 = 0x07,
+    Palette8 = 0x08,
+    Palette9 = 0x09,
+    Palette10 = 0x0A,
+    Palette11 = 0x0B,
+    Palette12 = 0x0C,
+    Palette13 = 0x0D,
+    Palette14 = 0x0E,
+    Palette15 = 0x0F,
+    ModeControl = 0x10,
+    OverscanColor = 0x11,
+    ColorPlaneEnable = 0x12,
+    HorizontalPixelPanning = 0x13,
+    ColorPlaneEnableVGA = 0x14,
+}
+
 impl VGA {
     pub fn set_sc_data(&self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
@@ -132,6 +159,14 @@ impl VGA {
 
     pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
         self.general_reg[reg as usize].load(Ordering::Acquire)
+    }
+
+    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
+        self.attribute_reg[reg as usize].swap(v, Ordering::AcqRel);
+    }
+
+    pub fn get_attribute_reg(&self, reg: AttributeReg) -> u8 {
+        self.attribute_reg[reg as usize].load(Ordering::Acquire)
     }
 
     pub fn get_video_mode(&self) -> u8 {
