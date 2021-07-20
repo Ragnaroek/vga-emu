@@ -12,7 +12,7 @@ use super::{CRTReg, GeneralReg, AttributeReg, VGA};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
 const CLEAR_DE_MASK: u8 = 0b11111110;
-pub const TARGET_FRAME_RATE_MICRO: u128 = 1000_000 / 60;
+pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 60;
 pub const VERTICAL_RESET_MICRO : u64 = 635;
 
 const DEBUG_HEIGHT: u32 = 20;
@@ -52,7 +52,7 @@ pub fn start_debug_planar_mode(
     h: u32,
     options: Options,
 ) -> Result<(), String> {
-    let mut debug_options = options.clone();
+    let mut debug_options = options;
     debug_options.start_addr_override = Some(0);
     start_video(vga, w, h, debug_options)
 }
@@ -103,7 +103,7 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
         .map_err(|e| e.to_string())?;
 
     let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
-    if offset_delta <= 0 {
+    if offset_delta == 0 {
         return Err(format!("illegal CRT offset: {}", offset_delta));
     }
 
@@ -129,12 +129,12 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
                     let end = if mem_byte == w_bytes - 1 {hpan} else {8};
                     for b in start..end {
                         let bx = (1 << (7 - b)) as u8;
-                        let mut c = bit_x(v0, bx, 0);
-                        c |= bit_x(v1, bx, 1);
-                        c |= bit_x(v2, bx, 2);
-                        c |= bit_x(v3, bx, 3);
+                        let mut pixel = bit_x(v0, bx, 0);
+                        pixel |= bit_x(v1, bx, 1);
+                        pixel |= bit_x(v2, bx, 2);
+                        pixel |= bit_x(v3, bx, 3);
 
-                        let color = default_color(c);
+                        let color = default_color(pixel);
                         let offset = y * pitch + x * 3;
                         buffer[offset] = color.r;
                         buffer[offset + 1] = color.g;
@@ -206,7 +206,7 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
         
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn mem_offset(vga: &VGA, options: &Options) -> usize {
@@ -217,7 +217,7 @@ fn mem_offset(vga: &VGA, options: &Options) -> usize {
     let mut addr = vga.get_crt_data(CRTReg::StartAdressHigh) as u16;
     addr <<= 8;
     addr |= low;
-    return addr as usize;
+    addr as usize
 }
 
 fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
@@ -252,7 +252,7 @@ fn set_de(vga: &VGA, display_mode: bool) {
 
 fn default_color(v: u8) -> Color {
     //source: https://wasteland.fandom.com/wiki/EGA_Colour_Palette
-    return match v {
+    match v {
         0x00 => Color::RGB(0x0, 0x0, 0x0),
         0x01 => Color::RGB(0x0, 0x0, 0xA8),
         0x02 => Color::RGB(0x0, 0xA8, 0x0),
@@ -270,5 +270,5 @@ fn default_color(v: u8) -> Color {
         0x0E => Color::RGB(0xFE, 0xFE, 0x54),
         0x0F => Color::RGB(0xFE, 0xFE, 0xFE),
         _ => panic!("wrong color index"),
-    };
+    }
 }

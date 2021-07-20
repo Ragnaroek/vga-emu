@@ -1,3 +1,5 @@
+#![allow(clippy::comparison_chain)]
+
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
 use std::sync::Arc;
 use std::thread;
@@ -56,10 +58,10 @@ fn initial_panning_state() -> PanningState {
 
 
 pub fn main() {
-    let mut vga = vga::new(0x10);
+    let vga = vga::new(0x10);
 
-    draw_border(&mut vga, PAGE0_OFFSET);
-    draw_border(&mut vga, PAGE1_OFFSET);
+    draw_border(&vga, PAGE0_OFFSET);
+    draw_border(&vga, PAGE1_OFFSET);
 
     let plane_1_data = vec![
         0x00, 0x3c, 0x00, 0x01, 0xff, 0x80, //
@@ -232,8 +234,7 @@ pub fn main() {
         }
     });
 
-    let mut options : screen::Options = Default::default();
-    options.show_frame_rate = true;
+    let options : screen::Options = vga::screen::Options { show_frame_rate: true, ..Default::default() };
     /*
     enable this for debugging:
     screen::start_debug_planar_mode(
