@@ -36,10 +36,13 @@ impl Default for Options {
 
 //Shows the screen according to the VGA video mode
 pub fn start(vga: Arc<VGA>, options: Options) -> Result<(), String> {
-    if vga.get_video_mode() == 0x10 {
+    let mode = vga.get_video_mode();
+    if mode == 0x10 { //TODO Get rid of this, width and height are derived from register state!!
         start_video(vga, 640, 350, options)
+    } else if mode == 0x13 {
+        start_video(vga, 320, 200, options)
     } else {
-        panic!("only video mode 0x10 implemented")
+        panic!("video mode {:x}h not implemented", vga.get_video_mode())
     }
 }
 

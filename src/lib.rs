@@ -3,7 +3,7 @@ pub mod screen;
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
-const PLANE_SIZE: usize = 0xFFFF; //64KiB
+pub const PLANE_SIZE: usize = 0xFFFF; //64KiB
 
 pub struct VGA {
     video_mode: AtomicU8,
@@ -27,7 +27,7 @@ pub fn new(video_mode: u8) -> VGA {
         init_atomic_u8_vec(PLANE_SIZE),
     ];
 
-    VGA {
+    let vga = VGA {
         video_mode: AtomicU8::new(video_mode),
         sc_reg: init_atomic_u8_vec(5),
         gc_reg: init_atomic_u8_vec(9),
@@ -36,7 +36,23 @@ pub fn new(video_mode: u8) -> VGA {
         general_reg: init_atomic_u8_vec(4),
         attribute_reg: init_atomic_u8_vec(21),
         mem,
-    }
+    };
+
+    match video_mode {
+        0x10 => setup_mode_10(&vga),
+        0x13 => setup_mode_13(&vga),
+        _ => panic!("video mode {:x}h not yet implemented", vga.get_video_mode()),
+    }    
+
+    vga
+}
+
+fn setup_mode_10(vga: &VGA) {
+    vga.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even 
+}
+
+fn setup_mode_13(vga: &VGA) {
+    vga.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
 }
 
 fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
@@ -53,7 +69,7 @@ pub enum SCReg {
     ClockingMode = 0x1,
     MapMask = 0x2,
     CharacterMapSelect = 0x3,
-    SequencerMemoryMode = 0x4,
+    MemoryMode = 0x4,
 }
 
 //Graphics Controller Register
@@ -176,7 +192,22 @@ impl VGA {
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
     pub fn write_mem(&self, offset: usize, v_in: u8) {
-        let dest = self.get_sc_data(SCReg::MapMask);
+        let mem_mode = self.get_sc_data(SCReg::MemoryMode);
+        let dest = if mem_mode & 0x08 != 0 {
+            //if chain4 is enabled write to all planes
+            0x0F
+        } else if mem_mode & 0x04 == 0 {
+            print!("odd/even enabled");
+            //odd/even enabled, determine plane on odd/even address
+            if offset % 2 == 0 {
+                0x05
+            } else {
+                0x0A
+            }
+        } else {
+            self.get_sc_data(SCReg::MapMask)
+        };
+
         let mut gc_mode = self.get_gc_data(GCReg::GraphicsMode);
         gc_mode &= 0x03;
 
@@ -200,14 +231,26 @@ impl VGA {
     }
 
     pub fn read_mem(&self, offset: usize) -> u8 {
-        let select = (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize;
+        let mem_mode = self.get_sc_data(SCReg::MemoryMode);
+        let select = if mem_mode & 0x08 != 0 {
+            //if chain4 is enabled, read from the plan determined by the offsets lower 2 bits
+            (offset & 0x03) as usize
+        } else {
+            (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
+        };
         for i in 0..4 {
             self.latch_reg[i].swap(self.mem[i][offset].load(Ordering::Acquire), Ordering::AcqRel);
         }
         self.latch_reg[select].load(Ordering::Acquire)
     }
 
+    //useful for testing, inspect the memory for a given plane
     pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
         self.mem[plane][offset].load(Ordering::Relaxed)
+    }
+
+    //useful for testing, set the memory in a given plane
+    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
+        self.mem[plane][offset].swap(v, Ordering::AcqRel);
     }
 }
