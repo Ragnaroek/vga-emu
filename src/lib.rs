@@ -48,11 +48,13 @@ pub fn new(video_mode: u8) -> VGA {
 }
 
 fn setup_mode_10(vga: &VGA) {
-    vga.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even 
+    vga.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even
+    vga.set_crt_data(CRTReg::MaximumScanLine, 0x00);
 }
 
 fn setup_mode_13(vga: &VGA) {
     vga.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
+    vga.set_crt_data(CRTReg::MaximumScanLine, 0x01);
 }
 
 fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
@@ -197,7 +199,6 @@ impl VGA {
             //if chain4 is enabled write to all planes
             0x0F
         } else if mem_mode & 0x04 == 0 {
-            print!("odd/even enabled");
             //odd/even enabled, determine plane on odd/even address
             if offset % 2 == 0 {
                 0x05
