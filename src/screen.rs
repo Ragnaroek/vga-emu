@@ -211,11 +211,11 @@ fn render_planar(
     let mut y: usize = 0;
     let mut mem_offset = mem_offset_p;
     let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
+    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 2; //+1 for exclusive intervall, +1 for "overshot" with potential hpan
 
     for _ in 0..(h / max_scan) {
         for _ in 0..max_scan {
             let hpan = vga.get_attribute_reg(AttributeReg::HorizontalPixelPanning) & 0xF;
-            let w_bytes = ((w / 8) as usize) + 1; //+1 for "overshot" with potential hpan
             for mem_byte in 0..w_bytes {
                 let v0 = vga.raw_read_mem(0, mem_offset + mem_byte);
                 let v1 = vga.raw_read_mem(1, mem_offset + mem_byte);
@@ -256,11 +256,12 @@ fn render_linear(
 ) {
     let mut mem_offset = mem_offset_p;
     let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
+    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 1;
 
     let mut buffer_offset = 0;
     for _ in 0..((h / max_scan) as usize) {
         for _ in 0..max_scan {
-            for x_byte in 0..80 {
+            for x_byte in 0..w_bytes {
                 for p in 0..4 {
                     let v = vga.raw_read_mem(p, mem_offset + x_byte);
                     let color = DEFAULT_256_COLORS[v as usize];
@@ -387,12 +388,7 @@ pub fn get_vertical_display_end(vga: &VGA) -> u32 {
 
 //width in pixel
 pub fn get_width(vga: &VGA) -> u32 {
-    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) + 1;
-    if is_linear(vga.get_video_mode()) {
-        (w_bytes as u32) * 8
-    } else {
-        (w_bytes as u32) * 4
-    }
+    (vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
 }
 
 pub fn get_height(vga: &VGA) -> u32 {
