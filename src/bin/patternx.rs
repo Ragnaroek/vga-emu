@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use vga::screen;
-use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
+//use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
 
 const SCREEN_WIDTH : usize = 80;
 

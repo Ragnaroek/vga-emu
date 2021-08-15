@@ -50,11 +50,15 @@ pub fn new(video_mode: u8) -> VGA {
 fn setup_mode_10(vga: &VGA) {
     vga.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even
     vga.set_crt_data(CRTReg::MaximumScanLine, 0x00);
+    set_horizontal_display_end(vga, 640);
+    set_vertical_display_end(vga, 350);
 }
 
 fn setup_mode_13(vga: &VGA) {
     vga.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
     vga.set_crt_data(CRTReg::MaximumScanLine, 0x01);
+    set_horizontal_display_end(vga, 640);
+    set_vertical_display_end(vga, 400);
 }
 
 fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
@@ -90,7 +94,7 @@ pub enum GCReg {
 //CRT Controller Registers
 pub enum CRTReg {
     HorizontalTotal = 0x00,
-    EndHorizontalDisplay = 0x01,
+    HorizontalDisplayEnd = 0x01,
     StartHorizontalBlanking = 0x02,
     EndHorizontalBlanking = 0x03,
     StartHorizontalRetrace = 0x04,
@@ -254,4 +258,29 @@ impl VGA {
     pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
         self.mem[plane][offset].swap(v, Ordering::AcqRel);
     }
+
+
+}
+
+pub fn is_linear(vmode: u8) -> bool {
+    vmode == 0x13
+}
+
+ //convenience functions
+
+pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
+    if is_linear(vga.get_video_mode()) {
+        vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/8) as u8);
+    } else {
+        vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/4) as u8);
+    }
+}
+
+pub fn set_vertical_display_end(vga: &VGA, height: u32) {
+    let h = height-1;
+    vga.set_crt_data(CRTReg::VerticalDisplayEnd, h as u8);
+    let bit_8 = ((h & 0x100) >> 8) as u8;
+    let bit_9 = ((h & 0x200) >> 9) as u8;
+    let overflow = bit_9 << 6 | bit_8 << 1;
+    vga.set_crt_data(CRTReg::Overflow, overflow); 
 }
