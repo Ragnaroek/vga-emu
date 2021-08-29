@@ -16,7 +16,6 @@ fn main() {
 	//enable Mode X
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
 	vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
-
 	set_vertical_display_end(&vga, 480);
 
 	fill_rectangle_x(&vga, 0, 0, 320, 240, 0, 0); 
@@ -58,8 +57,8 @@ fn fill_rectangle_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: usize
 		vga.set_sc_data(SCReg::MapMask, left_clip);
 		vga.write_mem(di, color);
 
-		for w in 0..(width-1) {
-			vga.set_sc_data(SCReg::MapMask, 0x0F);
+		vga.set_sc_data(SCReg::MapMask, 0x0F);
+		for w in 0..(width-1) {	
 			vga.write_mem(di+(w+1), color);
 		}
 

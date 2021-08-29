@@ -91,6 +91,31 @@ fn test_write_read_odd_even() {
 }
 
 #[test]
+fn test_bit_mask() {
+    let vga = vga::new(0x13); //mode 13 has odd/even enabled 
+    vga.set_sc_data(SCReg::MapMask, 0xFF);
+    vga.write_mem(666, 0xFF);
+    for i in 0..4 {
+        assert_eq!(vga.raw_read_mem(i, 666), 0xFF);
+    }
+
+    vga.set_gc_data(GCReg::BitMask, 0x0F);
+    vga.write_mem(666, 0xFF);
+    for i in 0..4 {
+        assert_eq!(vga.raw_read_mem(i, 666), 0x0F);
+    }
+
+    vga.set_gc_data(GCReg::BitMask, 0xFF);
+    vga.write_mem(600, 0b10101111);
+    vga.read_mem(600); //latch memory
+    vga.set_gc_data(GCReg::BitMask, 0x0F);
+    vga.write_mem(666, 0);
+    for i in 0..4 {
+        assert_eq!(vga.raw_read_mem(i, 666), 0b10100000);
+    } 
+}
+
+#[test]
 fn test_set_and_get_horizontal_display_end() {
     let vga = vga::new(0x10);
     set_horizontal_display_end(&vga, 640);

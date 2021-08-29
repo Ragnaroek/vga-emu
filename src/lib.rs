@@ -17,9 +17,6 @@ pub struct VGA {
 }
 
 pub fn new(video_mode: u8) -> VGA {
-    let mut crt_reg = init_atomic_u8_vec(25);
-    crt_reg[CRTReg::Offset as usize] = AtomicU8::new(40);
-
     let mem = vec![
         init_atomic_u8_vec(PLANE_SIZE),
         init_atomic_u8_vec(PLANE_SIZE),
@@ -31,12 +28,14 @@ pub fn new(video_mode: u8) -> VGA {
         video_mode: AtomicU8::new(video_mode),
         sc_reg: init_atomic_u8_vec(5),
         gc_reg: init_atomic_u8_vec(9),
-        crt_reg,
+        crt_reg:  init_atomic_u8_vec(25),
         latch_reg: init_atomic_u8_vec(4),
         general_reg: init_atomic_u8_vec(4),
         attribute_reg: init_atomic_u8_vec(21),
         mem,
     };
+
+    setup_defaults(&vga);
 
     match video_mode {
         0x10 => setup_mode_10(&vga),
@@ -45,6 +44,12 @@ pub fn new(video_mode: u8) -> VGA {
     }    
 
     vga
+}
+
+fn setup_defaults(vga: &VGA) {
+    vga.set_crt_data(CRTReg::Offset, 40);
+
+    vga.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
 fn setup_mode_10(vga: &VGA) {
@@ -214,6 +219,7 @@ impl VGA {
         };
 
         let mut gc_mode = self.get_gc_data(GCReg::GraphicsMode);
+        let bit_mask = self.get_gc_data(GCReg::BitMask);
         gc_mode &= 0x03;
 
         for i in 0..4 {
@@ -221,7 +227,8 @@ impl VGA {
                 let v = if gc_mode == 0x01 {
                     self.latch_reg[i].load(Ordering::Acquire)
                 } else {
-                    v_in
+                    let v_latch = self.latch_reg[i].load(Ordering::Acquire);
+                    v_in & bit_mask | (v_latch & !bit_mask)
                 };
                 self.mem[i][offset].swap(v, Ordering::Relaxed);
             }
