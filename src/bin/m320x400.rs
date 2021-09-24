@@ -3,8 +3,8 @@
 use std::sync::Arc;
 use std::thread;
 
-use vga::screen;
-use vga::{CRTReg, GCReg, SCReg};
+use vgaemu::screen;
+use vgaemu::{CRTReg, GCReg, SCReg};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -31,7 +31,7 @@ fn new_line(
 }
 
 pub fn main() {
-	let vga = vga::new(0x13);
+	let vga = vgaemu::new(0x13);
 
 	//set 320x400 mode
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -45,7 +45,7 @@ pub fn main() {
 
 	//clear display memory
 	vga.set_sc_data(SCReg::MapMask, 0x0F);
-	for cx in 0..vga::PLANE_SIZE {
+	for cx in 0..vgaemu::PLANE_SIZE {
 		vga.write_mem(cx, 0);
 	}
 
@@ -88,14 +88,14 @@ pub fn main() {
 		}
 	});
 
-	let options: screen::Options = vga::screen::Options {
+	let options: screen::Options = vgaemu::screen::Options {
 		show_frame_rate: true,
 		..Default::default()
 	};
 	screen::start(vga_m, options).unwrap();
 }
 
-fn write_pixel(vga: &vga::VGA, x: i16, y: i16, color: u8) {
+fn write_pixel(vga: &vgaemu::VGA, x: i16, y: i16, color: u8) {
 	let mut offset = (SCREEN_WIDTH / 4) * y as usize;
 	offset += x as usize / 4;
 
