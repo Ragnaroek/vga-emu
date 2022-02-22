@@ -1,7 +1,7 @@
 [package]
 name = "vga-emu"
-version = "0.1.0"
-edition = "2018"
+version = "0.1.1"
+edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
 license = "GPL-3.0"
@@ -31,6 +31,6 @@ path = "src/bin/rectx.rs"
 name = "vgaemu"
 
 [dependencies.sdl2]
-version = "0.35.1"
+version = "0.35.2"
 default-features = false
 features = ["ttf"]
