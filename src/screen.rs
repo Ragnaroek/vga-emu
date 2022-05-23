@@ -345,9 +345,12 @@ fn render_linear(
                     let v = vga.raw_read_mem(p, mem_offset + x_byte);
                     let color = vga.get_color_palette_256(v as usize);
                     for _ in 0..v_stretch {
-                        buffer[buffer_offset] = ((color & 0xFF0000) >> 16) as u8;
-                        buffer[buffer_offset + 1] = ((color & 0x00FF00) >> 8) as u8;
-                        buffer[buffer_offset + 2] = (color & 0x0000FF) as u8;
+                        // each color part (RGB) contains the high-order 6 bit values. 
+                        // To get a "real" RGB value for display the value have to shifted
+                        // by 2 bits (otherwise the color will be dimmed)
+                        buffer[buffer_offset] = ((color & 0xFF0000) >> 14) as u8;
+                        buffer[buffer_offset + 1] = ((color & 0x00FF00) >> 6) as u8;
+                        buffer[buffer_offset + 2] = ((color & 0x0000FF) << 2) as u8;
                         buffer_offset += 3;
                     }
                 }
