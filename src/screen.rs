@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -16,26 +17,30 @@ use super::input::{InputMonitoring, NumCode, Keyboard};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
 const CLEAR_DE_MASK: u8 = 0b11111110;
-pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 60;
+pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
 pub const VERTICAL_RESET_MICRO: u64 = 635;
 
 const DEBUG_HEIGHT: usize = 20;
 const FRAME_RATE_SAMPLES: usize = 100;
 
 #[derive(Clone)]
-pub struct Options {
+pub struct Options
+ {
     pub show_frame_rate: bool,
     pub start_addr_override: Option<usize>,
     pub input_monitoring: Option<InputMonitoring>,
+    /// This counter is increment on each frame
+    pub frame_count: Arc<AtomicU64>,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Options {
             show_frame_rate: false,
-            //set in debug mode to ignore the start adress set in the vga
+            //set in debug mode to ignore the start address set in the vga
             start_addr_override: None,
             input_monitoring: None,
+            frame_count: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -165,6 +170,8 @@ pub fn start(vga: Arc<VGA>, options: Options) -> Result<(), String> {
         set_vr(&vga, true);
         sleep(Duration::from_micros(VERTICAL_RESET_MICRO));
         set_vr(&vga, false);
+
+        options.frame_count.fetch_add(1, Ordering::Relaxed);
 
         let v_elapsed = frame_start.elapsed().as_micros();
         if v_elapsed < TARGET_FRAME_RATE_MICRO {
