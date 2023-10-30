@@ -3,9 +3,8 @@ use std::fs;
 use std::io;
 use std::env;
 
-use vgaemu::screen;
-use vgaemu::util;
-use vgaemu::{SCReg, ColorReg};
+use vga::util;
+use vga::{SCReg, ColorReg};
 
 const SCREEN_WIDTH : usize = 320;
 const SCREEN_HEIGHT : usize = 200;
@@ -14,7 +13,7 @@ const PALETTE_SIZE : usize = 16;
 
 
 fn main() -> io::Result<()> {
-	let vga = vgaemu::new(0x13);
+	let vga = vga::new(0x13);
 	
 	//enable Mode X
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -42,15 +41,15 @@ fn main() -> io::Result<()> {
 
 	let vga_m = Arc::new(vga);
 
-	let options: screen::Options = vgaemu::screen::Options {
+	let options: vga::Options = vga::Options {
 		show_frame_rate: true,
 		..Default::default()
 	};
-	screen::start(vga_m, options).unwrap();
+	vga_m.start(options).unwrap();
 	Ok(())
 }
 
-pub fn set_palette(vga: &vgaemu::VGA, palette: &[u8]) {
+pub fn set_palette(vga: &vga::VGA, palette: &[u8]) {
 	assert_eq!(palette.len(), 768, "palette file must be exact 768 bytes long");
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
     for i in 0..768 {

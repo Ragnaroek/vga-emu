@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use vgaemu::screen;
-use vgaemu::util;
-use vgaemu::{SCReg, set_vertical_display_end};
+use vga::util;
+use vga::{SCReg, set_vertical_display_end};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 240;
@@ -37,7 +36,7 @@ static SMOKE_MASK : [u8; 49] = [
    0, 0, 1, 1, 1, 0, 0];
 
 pub fn main() {
-	let vga = vgaemu::new(0x13);
+	let vga = vga::new(0x13);
 
 	//enable Mode X
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -50,14 +49,14 @@ pub fn main() {
 
 	let vga_m = Arc::new(vga);
 
-	let options: screen::Options = vgaemu::screen::Options {
+	let options: vga::Options = vga::Options {
 		show_frame_rate: true,
 		..Default::default()
 	};
-	screen::start(vga_m, options).unwrap();
+	vga_m.start(options).unwrap();
 }
 
-fn draw_background(vga: &vgaemu::VGA, page_start: usize) {
+fn draw_background(vga: &vga::VGA, page_start: usize) {
 	//cyan background
 	util::fill_rectangle_x(vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, page_start, 11);
 	//brown plain

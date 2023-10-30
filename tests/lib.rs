@@ -1,11 +1,11 @@
-extern crate vgaemu;
+extern crate vga;
 
-use vgaemu::{GCReg, SCReg, ColorReg, PLANE_SIZE, set_horizontal_display_end, set_vertical_display_end};
-use vgaemu::screen::{get_width, get_height};
+use vga::{GCReg, SCReg, ColorReg, PLANE_SIZE, set_horizontal_display_end, set_vertical_display_end};
+use vga::util::{get_width, get_height};
 
 #[test]
 fn test_write_read_mem_mode_0() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -29,7 +29,7 @@ fn test_write_read_mem_mode_0() {
 
 #[test]
 fn test_write_read_mem_mode_1() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {
@@ -50,7 +50,7 @@ fn test_write_read_mem_mode_1() {
 
 #[test]
 fn test_write_read_chain_4() {
-    let vga = vgaemu::new(0x13); //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
+    let vga = vga::new(0x13); //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
 
     for i in 0..PLANE_SIZE {
         vga.write_mem(i, i as u8);
@@ -74,7 +74,7 @@ fn test_write_read_chain_4() {
 
 #[test]
 fn test_write_read_odd_even() {
-    let vga = vgaemu::new(0x13); //mode 13 has odd/even enabled
+    let vga = vga::new(0x13); //mode 13 has odd/even enabled
     vga.set_sc_data(SCReg::MemoryMode, vga.get_sc_data(SCReg::MemoryMode) & !0x08); //disable chain4 (otherwise odd/even is not enabled)
 
     for i in 0..PLANE_SIZE {
@@ -92,7 +92,7 @@ fn test_write_read_odd_even() {
 
 #[test]
 fn test_bit_mask() {
-    let vga = vgaemu::new(0x13); //mode 13 has odd/even enabled 
+    let vga = vga::new(0x13); //mode 13 has odd/even enabled 
     vga.set_sc_data(SCReg::MapMask, 0xFF);
     vga.write_mem(666, 0xFF);
     for i in 0..4 {
@@ -117,14 +117,14 @@ fn test_bit_mask() {
 
 #[test]
 fn test_set_and_get_horizontal_display_end() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
     set_horizontal_display_end(&vga, 640);
     assert_eq!(get_width(&vga), 640);
 }
 
 #[test]
 fn test_set_and_get_vertical_display_end() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
     set_vertical_display_end(&vga, 400);
     assert_eq!(get_height(&vga), 400);
 
@@ -134,7 +134,7 @@ fn test_set_and_get_vertical_display_end() {
 
 #[test]
 fn test_set_color() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
 
     for i in 0..3 {

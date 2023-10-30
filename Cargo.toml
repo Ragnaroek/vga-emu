@@ -1,11 +1,15 @@
 [package]
 name = "vga-emu"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
 license = "GPL-3.0"
 repository = "https://github.com/Ragnaroek/vga-emu"
+
+[features]
+sdl = []
+web = []
 
 [[bin]]
 name = "ball"
@@ -32,7 +36,8 @@ name = "palette"
 path = "src/bin/palette.rs"
 
 [lib]
-name = "vgaemu"
+name = "vga"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies.sdl2]
 version = "0.35.2"
