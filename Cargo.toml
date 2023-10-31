@@ -1,15 +1,23 @@
 [package]
 name = "vga-emu"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
 license = "GPL-3.0"
 repository = "https://github.com/Ragnaroek/vga-emu"
 
+[lib]
+name = "vga"
+crate-type = ["cdylib", "rlib"]
+
 [features]
-sdl = []
-web = []
+sdl = ["dep:sdl2"]
+web = ["dep:wasm-bindgen"]
+
+[dependencies]
+sdl2 = { version = "0.35.2", optional = true, default-features = false, features = ["ttf"] }
+wasm-bindgen = { version = "0.2.87", optional = true }
 
 [[bin]]
 name = "ball"
@@ -34,12 +42,3 @@ path = "src/bin/rectx.rs"
 [[bin]]
 name = "palette"
 path = "src/bin/palette.rs"
-
-[lib]
-name = "vga"
-crate-type = ["cdylib", "rlib"]
-
-[dependencies.sdl2]
-version = "0.35.2"
-default-features = false
-features = ["ttf"]
