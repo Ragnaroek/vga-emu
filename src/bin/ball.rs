@@ -170,8 +170,6 @@ pub fn main() {
         }
 
         loop {
-            web_sys::console::log_1(&format!("### rendering loop").into());
-
             for bx in (0..NUM_BALLS).rev() {
                 draw_ball(
                     &vga_t,
