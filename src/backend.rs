@@ -1,8 +1,5 @@
 /// Contains common functionality shared across all backend implementations
-use crate::{CRTReg, VGA, AttributeReg, GeneralReg, Options};
-
-const CLEAR_DE_MASK: u8 = 0b11111110;
-const CLEAR_VR_MASK: u8 = 0b11110111;
+use crate::{CRTReg, VGA, AttributeReg, Options};
 
 #[derive(Debug)]
 pub struct RGB {
@@ -120,48 +117,6 @@ fn default_16_color(v: u8) -> RGB {
         0x0E => rgb(0xFE, 0xFE, 0x54),
         0x0F => rgb(0xFE, 0xFE, 0xFE),
         _ => panic!("wrong color index: {}", v),
-    }
-}
-
-/// width in pixel
-pub fn get_width(vga: &VGA) -> u32 {
-    (vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
-}
-
-pub fn get_height(vga: &VGA) -> u32 {
-    get_vertical_display_end(&vga) + 1
-}
-
-/// Constructs the Vertical Display End from the register + offset register
-fn get_vertical_display_end(vga: &VGA) -> u32 {
-    let vde_lower = vga.get_crt_data(CRTReg::VerticalDisplayEnd);
-    let overflow = vga.get_crt_data(CRTReg::Overflow);
-    let vde_bit_8 = (overflow & 0b0000_0010) >> 1;
-    let vde_bit_9 = (overflow & 0b0100_0000) >> 5;
-    let vde_upper = vde_bit_8 | vde_bit_9;
-    let vde = vde_lower as u32;
-    vde | ((vde_upper as u32) << 8)
-}
-
-/// display enable NOT
-pub fn set_de(vga: &VGA, display_mode: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
-    if display_mode {
-        //flag needs to be set to zero (NOT)
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
-    } else {
-        //not in display mode (vertical or horizontal retrace), set to 1
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
-    }
-}
-
-/// vertical retrace
-pub fn set_vr(vga: &VGA, set: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
-    if set {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
-    } else {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
     }
 }
 

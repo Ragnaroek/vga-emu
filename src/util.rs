@@ -4,7 +4,7 @@ use std::future::Future;
 use std::time::Duration;
 use async_std::task::{self, JoinHandle};
 
-use crate::GeneralReg;
+use crate::{GeneralReg, CRTReg};
 use crate::{SCReg, GCReg, VGA, PLANE_SIZE};
 
 const SCREEN_WIDTH : usize = 80;
@@ -17,6 +17,9 @@ const VSYNC_MASK: u8 = 0x08;
 const DE_MASK: u8 = 0x01;
 
 const POLL_WAIT_MICROS : u64 = 500;
+
+const CLEAR_DE_MASK: u8 = 0b11111110;
+const CLEAR_VR_MASK: u8 = 0b11110111;
 
 #[cfg(feature = "sdl")]
 pub fn spawn_task<F, T>(future: F) -> JoinHandle<T>
@@ -55,6 +58,48 @@ pub async fn vsync(vga: &VGA) {
             break;
         }
 		task::sleep(Duration::from_micros(POLL_WAIT_MICROS)).await; 
+    }
+}
+
+/// width in pixel
+pub fn get_width(vga: &VGA) -> u32 {
+    (vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
+}
+
+pub fn get_height(vga: &VGA) -> u32 {
+    get_vertical_display_end(&vga) + 1
+}
+
+/// Constructs the Vertical Display End from the register + offset register
+fn get_vertical_display_end(vga: &VGA) -> u32 {
+    let vde_lower = vga.get_crt_data(CRTReg::VerticalDisplayEnd);
+    let overflow = vga.get_crt_data(CRTReg::Overflow);
+    let vde_bit_8 = (overflow & 0b0000_0010) >> 1;
+    let vde_bit_9 = (overflow & 0b0100_0000) >> 5;
+    let vde_upper = vde_bit_8 | vde_bit_9;
+    let vde = vde_lower as u32;
+    vde | ((vde_upper as u32) << 8)
+}
+
+/// display enable NOT
+pub fn set_de(vga: &VGA, display_mode: bool) {
+    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+    if display_mode {
+        //flag needs to be set to zero (NOT)
+        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
+    } else {
+        //not in display mode (vertical or horizontal retrace), set to 1
+        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
+    }
+}
+
+/// vertical retrace
+pub fn set_vr(vga: &VGA, set: bool) {
+    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+    if set {
+        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
+    } else {
+        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
     }
 }
 

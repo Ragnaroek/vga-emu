@@ -9,17 +9,10 @@ use wasm_bindgen_futures::spawn_local;
 use crate::CRTReg;
 use crate::TARGET_FRAME_RATE_MICRO;
 use crate::VERTICAL_RESET_MICRO;
-use crate::backend::PixelBuffer;
-use crate::backend::get_height;
-use crate::backend::get_width;
-use crate::backend::is_linear;
-use crate::backend::mem_offset;
-use crate::backend::render_linear;
-use crate::backend::render_planar;
-use crate::backend::set_de;
-use crate::backend::set_vr;
+use crate::backend::{PixelBuffer, is_linear, mem_offset, render_linear, render_planar };
+use crate::util::{set_vr, set_de, get_width, get_height};
 use crate::{ VGA, Options };
-use crate::input::{InputMonitoring, Keyboard, NumCode};
+use crate::input::{InputMonitoring, NumCode};
 
 struct WebBuffer {
     data: Vec<u8>
