@@ -3,3 +3,7 @@ web:
 
 sdl:
 	cargo build --features sdl
+
+test:
+	cargo test --features sdl
+	cargo test --features web
