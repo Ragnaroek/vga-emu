@@ -7,3 +7,6 @@ sdl:
 test:
 	cargo test --features sdl
 	cargo test --features web
+
+publish:
+	cargo publish --features sdl
