@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.5.1"
+version = "0.5.3"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
@@ -20,10 +20,10 @@ async-std = { version = "1.12.0", features = ["unstable"] }
 # feature "sdl"
 sdl2 = { version = "0.36.0", optional = true, default-features = false, features = ["ttf"] }
 # feature "web"
-wasm-bindgen = { version = "0.2.88", optional = true }
-wasm-bindgen-futures = { version = "0.4.38", optional = true }
-js-sys = { version = "0.3.65", optional = true }
-web-sys = { version = "0.3.65", optional = true, features = [
+wasm-bindgen = { version = "0.2.90", optional = true }
+wasm-bindgen-futures = { version = "0.4.40", optional = true }
+js-sys = { version = "0.3.67", optional = true }
+web-sys = { version = "0.3.67", optional = true, features = [
   'Document',
   'Window',
   'CanvasRenderingContext2d',

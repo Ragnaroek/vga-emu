@@ -4,6 +4,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+# [0.5.3]
+- SDL: Don't exit on ESC key press (has to be handled by the application)
+
 # [0.5.2]
 - sdl2 0.36.0
 
