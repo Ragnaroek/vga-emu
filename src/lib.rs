@@ -7,7 +7,7 @@ pub mod backend_sdl;
 pub mod backend_web;
 
 use std::sync::atomic::{AtomicU8, AtomicU16, Ordering, AtomicU64};
-use std::sync::{RwLock, Arc};
+use std::sync::{RwLock, Arc, Mutex};
 use input::InputMonitoring;
 
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
@@ -17,12 +17,11 @@ const DEBUG_HEIGHT: usize = 20;
 pub const FRAME_RATE_SAMPLES: usize = 100;
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
-#[derive(Clone)]
 pub struct Options
  {
     pub show_frame_rate: bool,
     pub start_addr_override: Option<usize>,
-    pub input_monitoring: Option<InputMonitoring>,
+    pub input_monitoring: Option<Arc<Mutex<InputMonitoring>>>,
     /// This counter is increment on each frame
     pub frame_count: Arc<AtomicU64>,
 }

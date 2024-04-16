@@ -1,26 +1,21 @@
-use std::sync::{Arc, Mutex};
-
 const NUM_KEYS : usize = 128;
 
-#[derive(Clone)]
 pub struct InputMonitoring {
-    pub keyboard: Arc<Mutex<Keyboard>>,
-    pub mouse: Arc<Mutex<Mouse>>,
+    pub keyboard: Keyboard,
+    pub mouse: Mouse,
 }
 
 impl InputMonitoring {
-    pub fn clear_keyboard(&self) {
-        let kb = &mut *self.keyboard.lock().unwrap();
+    pub fn clear_keyboard(&mut self) {
         for i in 0..NUM_KEYS {
-            kb.buttons[i] = false;
+            self.keyboard.buttons[i] = false;
         }
     }
 
     // convenience method, returns true if any keyboard key was pressed
     pub fn any_key_pressed(&self) -> bool {
-        let kb = &mut *self.keyboard.lock().unwrap();
         for i in 0..NUM_KEYS {
-            if kb.buttons[i] == true {
+            if self.keyboard.buttons[i] == true {
                 return true;
             }
         }
@@ -28,28 +23,29 @@ impl InputMonitoring {
     }
 
     pub fn key_pressed(&self, key: NumCode) -> bool {
-        let kb = &mut *self.keyboard.lock().unwrap();
-        return kb.buttons[key as usize] 
+        return self.keyboard.buttons[key as usize] 
     }
 }
 
 pub fn new_input_monitoring() -> InputMonitoring {
     let keyboard = Keyboard{
+        last_scan: NumCode::None,
         buttons: [false; NUM_KEYS]
     };
     let mouse = Mouse {};
     
     InputMonitoring {
-        keyboard: Arc::new(Mutex::new(keyboard)),
-        mouse: Arc::new(Mutex::new(mouse)),
+        keyboard,
+        mouse,
     }
 }
 
 pub struct Keyboard {
+    pub last_scan: NumCode,
     pub buttons: [bool; NUM_KEYS],
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum NumCode {
     None = 0x0,
     Bad = 0xff,
