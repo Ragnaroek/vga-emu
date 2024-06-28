@@ -30,6 +30,7 @@ impl InputMonitoring {
 pub fn new_input_monitoring() -> InputMonitoring {
     let keyboard = Keyboard{
         last_scan: NumCode::None,
+        last_ascii: '\0',
         buttons: [false; NUM_KEYS]
     };
     let mouse = Mouse {};
@@ -42,7 +43,88 @@ pub fn new_input_monitoring() -> InputMonitoring {
 
 pub struct Keyboard {
     pub last_scan: NumCode,
+    pub last_ascii: char,
     pub buttons: [bool; NUM_KEYS],
+}
+
+impl Keyboard {
+    pub fn update_last_value(&mut self, last_scan: NumCode) {
+        self.last_scan = last_scan;
+        self.update_ascii(last_scan);         
+    }
+
+    fn update_ascii(&mut self, last_scan: NumCode) {
+        // TODO handle CapsLock (requires state in the Keyboard mgr)
+        let shifted = self.buttons[NumCode::LShift as usize] || self.buttons[NumCode::RShift as usize];
+        let c = match (last_scan, shifted) {
+            (NumCode::Num0, false)|(NumCode::Num0, true) => '0',
+            (NumCode::Num1, false)|(NumCode::Num1, true) => '1',
+            (NumCode::Num2, false)|(NumCode::Num2, true) => '2',
+            (NumCode::Num3, false)|(NumCode::Num3, true) => '3',
+            (NumCode::Num4, false)|(NumCode::Num4, true) => '4',
+            (NumCode::Num5, false)|(NumCode::Num5, true) => '5',
+            (NumCode::Num6, false)|(NumCode::Num6, true) => '6',
+            (NumCode::Num7, false)|(NumCode::Num7, true) => '7',
+            (NumCode::Num8, false)|(NumCode::Num8, true) => '8',
+            (NumCode::Num9, false)|(NumCode::Num9, true) => '9',
+            (NumCode::A, false) => 'a',
+            (NumCode::B, false) => 'b', 
+            (NumCode::C, false) => 'c', 
+            (NumCode::D, false) => 'd', 
+            (NumCode::E, false) => 'e', 
+            (NumCode::F, false) => 'f', 
+            (NumCode::G, false) => 'g', 
+            (NumCode::H, false) => 'h', 
+            (NumCode::I, false) => 'i', 
+            (NumCode::J, false) => 'j', 
+            (NumCode::K, false) => 'k', 
+            (NumCode::L, false) => 'l', 
+            (NumCode::M, false) => 'm', 
+            (NumCode::N, false) => 'n', 
+            (NumCode::O, false) => 'o', 
+            (NumCode::P, false) => 'p', 
+            (NumCode::Q, false) => 'q', 
+            (NumCode::R, false) => 'r', 
+            (NumCode::S, false) => 's', 
+            (NumCode::T, false) => 't', 
+            (NumCode::U, false) => 'u', 
+            (NumCode::V, false) => 'v', 
+            (NumCode::W, false) => 'w', 
+            (NumCode::X, false) => 'x', 
+            (NumCode::Y, false) => 'y', 
+            (NumCode::Z, false) => 'z',
+            (NumCode::A, true) => 'A',
+            (NumCode::B, true) => 'B', 
+            (NumCode::C, true) => 'C', 
+            (NumCode::D, true) => 'D', 
+            (NumCode::E, true) => 'E', 
+            (NumCode::F, true) => 'F', 
+            (NumCode::G, true) => 'G', 
+            (NumCode::H, true) => 'H', 
+            (NumCode::I, true) => 'I', 
+            (NumCode::J, true) => 'J', 
+            (NumCode::K, true) => 'K', 
+            (NumCode::L, true) => 'L', 
+            (NumCode::M, true) => 'M', 
+            (NumCode::N, true) => 'N', 
+            (NumCode::O, true) => 'O', 
+            (NumCode::P, true) => 'P', 
+            (NumCode::Q, true) => 'Q', 
+            (NumCode::R, true) => 'R', 
+            (NumCode::S, true) => 'S', 
+            (NumCode::T, true) => 'T', 
+            (NumCode::U, true) => 'U', 
+            (NumCode::V, true) => 'V', 
+            (NumCode::W, true) => 'W', 
+            (NumCode::X, true) => 'X', 
+            (NumCode::Y, true) => 'Y', 
+            (NumCode::Z, true) => 'Z',  
+            _ => '\0'
+        };
+        if c != '\0' {
+            self.last_ascii = c;
+        }
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq)]

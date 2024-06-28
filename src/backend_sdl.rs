@@ -174,8 +174,8 @@ fn clear_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
 fn set_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
     if let Some(code) = keycode {
         let num_code = to_num_code(code);
-        state.keyboard.last_scan = num_code;
         state.keyboard.buttons[num_code as usize] = true;
+        state.keyboard.update_last_value(num_code);
     }
 }
 

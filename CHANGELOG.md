@@ -2,7 +2,10 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](http://semver.org/).
 
-## [Unreleased]
+# [Unreleased]
+
+# [0.6.1]
+- last_ascii in Keyboard
 
 # [0.6.0]
 - last_scan in Keyboard
