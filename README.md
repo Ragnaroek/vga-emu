@@ -6,3 +6,7 @@
 
 Coming next:
 https://www.phatcode.net/res/224/files/html/ch24/24-02.html
+
+Supports different render backends. At the moment supported:
+* SDL
+* Web (in progress)

@@ -2,9 +2,8 @@
 
 use std::sync::Arc;
 
-use vgaemu::screen;
-use vgaemu::util;
-use vgaemu::{SCReg, set_vertical_display_end};
+use vga::util;
+use vga::{SCReg, set_vertical_display_end};
 
 static PATT_TABLE: [[u8; 16]; 16] = [
 	[10,0,10,0,0,10,0,10,10,0,10,0,0,10,0,10],
@@ -26,7 +25,7 @@ static PATT_TABLE: [[u8; 16]; 16] = [
 ];
 
 pub fn main() {
-	let vga = vgaemu::new(0x13);
+	let vga = vga::new(0x13);
 
 	//enable Mode X
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -41,10 +40,10 @@ pub fn main() {
 
 	let vga_m = Arc::new(vga);
 
-	let options: screen::Options = vgaemu::screen::Options {
+	let options: vga::Options = vga::Options {
 		show_frame_rate: true,
 		..Default::default()
 	};
-	screen::start(vga_m, options).unwrap()
+	vga_m.start(options).unwrap()
 }
 
