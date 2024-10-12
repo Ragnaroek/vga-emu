@@ -1,6 +1,7 @@
 extern crate vga;
 
-use vga::{GCReg, SCReg, PLANE_SIZE};
+use vga::{GCReg, SCReg, PLANE_SIZE, set_horizontal_display_end, set_vertical_display_end};
+use vga::screen::{get_width, get_height};
 
 #[test]
 fn test_write_read_mem_mode_0() {
@@ -87,4 +88,21 @@ fn test_write_read_odd_even() {
             assert_eq!(vga.raw_read_mem(p, i), expected);
         }
     }
+}
+
+#[test]
+fn test_set_and_get_horizontal_display_end() {
+    let vga = vga::new(0x10);
+    set_horizontal_display_end(&vga, 640);
+    assert_eq!(get_width(&vga), 640);
+}
+
+#[test]
+fn test_set_and_get_vertical_display_end() {
+    let vga = vga::new(0x10);
+    set_vertical_display_end(&vga, 400);
+    assert_eq!(get_height(&vga), 400);
+
+    set_vertical_display_end(&vga, 1024);
+    assert_eq!(get_height(&vga), 1024);
 }

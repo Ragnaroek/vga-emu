@@ -8,7 +8,7 @@ use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::ttf;
 
-use super::{AttributeReg, CRTReg, GeneralReg, VGA};
+use super::{AttributeReg, CRTReg, GeneralReg, VGA, is_linear, set_horizontal_display_end, set_vertical_display_end};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
 const CLEAR_DE_MASK: u8 = 0b11111110;
@@ -34,18 +34,6 @@ impl Default for Options {
     }
 }
 
-//Shows the screen according to the VGA video mode
-pub fn start(vga: Arc<VGA>, options: Options) -> Result<(), String> {
-    let mode = vga.get_video_mode();
-    if mode == 0x10 {
-        start_video(vga, 640, 350, options, 1)
-    } else if mode == 0x13 {
-        start_video(vga, 640, 400, options, 2)
-    } else {
-        panic!("video mode {:x}h not implemented", vga.get_video_mode())
-    }
-}
-
 //Shows the full content of the VGA buffer as one big screen (for debugging) for
 //the planar modes. width and height depends on your virtual screen size (640x819 if
 //you did not change the default settings)
@@ -57,15 +45,16 @@ pub fn start_debug_planar_mode(
 ) -> Result<(), String> {
     let mut debug_options = options;
     debug_options.start_addr_override = Some(0);
-    start_video(vga, w, h, debug_options, 0)
+
+    set_horizontal_display_end(&vga, w as u32);
+    set_vertical_display_end(&vga, h as u32);
+
+    start(vga, debug_options)
 }
 
-fn start_video(
+pub fn start(
     vga: Arc<VGA>,
-    w: usize,
-    h: usize,
-    options: Options,
-    v_stretch: usize,
+    options: Options
 ) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
@@ -90,6 +79,20 @@ fn start_video(
     let mut fr_ix = 0;
     let mut fr_sum = 0;
     let mut fr_vsync = 1;
+
+    let vmode = vga.get_video_mode();
+    let linear = is_linear(vmode);
+
+    let w = get_width(&vga) as usize;
+    let h = get_height(&vga) as usize;
+
+    //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
+    //but I haven't figured out how yet
+    let v_stretch = if vmode == 0x13 {
+        2
+    } else {
+        1
+    };
 
     let window = video_subsystem
         .window(
@@ -116,14 +119,12 @@ fn start_video(
         return Err(format!("illegal CRT offset: {}", offset_delta));
     }
 
-    let vmode = vga.get_video_mode();
-
     'running: loop {
         let mem_offset = mem_offset(&vga, &options);
         let frame_start = Instant::now();
         set_de(&vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
-            if vmode == 0x13 {
+            if linear {
                 render_linear(&vga, mem_offset, offset_delta, h, v_stretch, buffer);
             } else {
                 render_planar(
@@ -257,7 +258,7 @@ fn render_linear(
     let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
 
     let mut buffer_offset = 0;
-    for y in 0..((h / max_scan) as usize) {
+    for _ in 0..((h / max_scan) as usize) {
         for _ in 0..max_scan {
             for x_byte in 0..80 {
                 for p in 0..4 {
@@ -372,3 +373,28 @@ static DEFAULT_256_COLORS: [u32; 256] = [
     0x2D413D, 0x2D4141, 0x2D3D41, 0x2D3541, 0x2D3141, 0x000000, 0x000000, 0x000000, 0x000000,
     0x000000, 0x000000, 0x000000, 0x00000,
 ];
+
+//Constructs the Vertical Display End from the register + offset register
+pub fn get_vertical_display_end(vga: &VGA) -> u32 {
+    let vde_lower = vga.get_crt_data(CRTReg::VerticalDisplayEnd);
+    let overflow = vga.get_crt_data(CRTReg::Overflow);
+    let vde_bit_8 = (overflow & 0b0000_0010) >> 1;
+    let vde_bit_9 = (overflow & 0b0100_0000) >> 5;
+    let vde_upper = vde_bit_8 | vde_bit_9;
+    let vde = vde_lower as u32;
+    vde | ((vde_upper as u32) << 8)
+}
+
+//width in pixel
+pub fn get_width(vga: &VGA) -> u32 {
+    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) + 1;
+    if is_linear(vga.get_video_mode()) {
+        (w_bytes as u32) * 8
+    } else {
+        (w_bytes as u32) * 4
+    }
+}
+
+pub fn get_height(vga: &VGA) -> u32 {
+    get_vertical_display_end(&vga) + 1
+}
