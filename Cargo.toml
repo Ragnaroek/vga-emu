@@ -27,6 +27,10 @@ path = "src/bin/patternx.rs"
 name = "rectx"
 path = "src/bin/rectx.rs"
 
+[[bin]]
+name = "palette"
+path = "src/bin/palette.rs"
+
 [lib]
 name = "vgaemu"
 
