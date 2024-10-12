@@ -54,10 +54,10 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
 
                 for b in 0..8 {
                     let bx = (1 << b) as u8;
-                    let mut c = (v1 & bx) << 4;
-                    c |= (v2 & bx) << 3;
-                    c |= (v3 & bx) << 2;
-                    c |= v4 & bx;
+                    let mut c = bit_x(v1, bx, 3);
+                    c |= bit_x(v2, bx, 2);
+                    c |= bit_x(v3, bx, 1);
+                    c |= bit_x(v4, bx, 0);
                     canvas.set_draw_color(default_color(c));
                     canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
                     x += 1;
@@ -82,6 +82,14 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
     }
+
+    fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
+        if v & v_ix != 0 {
+            1 << dst_ix
+        } else {
+            0
+        }
+    }
 }
 
 fn default_color(v: u8) -> Color {
@@ -102,6 +110,6 @@ fn default_color(v: u8) -> Color {
         0x0D => Color::RGB(0xFF, 0x33, 0xFF),
         0x0E => Color::RGB(0xFF, 0xFF, 0x66),
         0x0F => Color::RGB(0xFF, 0xFF, 0xFF),
-        _ => Color::RGB(0, 0, 0),
+        _ => panic!("wrong color index"),
     };
 }
