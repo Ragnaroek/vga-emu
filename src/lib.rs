@@ -8,6 +8,7 @@ pub struct VGA {
     gc_reg: [u8; 9],
     crt_reg: [u8; 25],
     latch_reg: [u8; 4],
+    general_reg: [u8; 4],
     pub mem: [[u8; PLANE_SIZE]; 4],
 }
 
@@ -21,6 +22,7 @@ pub fn new(video_mode: u8) -> VGA {
         gc_reg: [0; 9],
         crt_reg,
         latch_reg: [0; 4],
+        general_reg: [0; 4],
         mem: [[0; PLANE_SIZE]; 4],
     }
 }
@@ -75,6 +77,13 @@ pub enum CRTReg {
     LineCompare = 0x18,
 }
 
+pub enum GeneralReg {
+    MiscOutput = 0x00,
+    FeatureContorl = 0x01,
+    InputStatus0 = 0x02,
+    InputStatus1 = 0x03,
+}
+
 impl VGA {
     pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize] = v;
@@ -98,6 +107,14 @@ impl VGA {
 
     pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
         self.crt_reg[reg as usize]
+    }
+
+    pub fn set_general_reg(&mut self, reg: GeneralReg, v: u8) {
+        self.general_reg[reg as usize] = v;
+    }
+
+    pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
+        self.general_reg[reg as usize]
     }
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
