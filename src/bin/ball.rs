@@ -1,7 +1,7 @@
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
 use std::sync::Arc;
 use vga::screen;
-use vga::SCReg;
+use vga::{CRTReg, GCReg, SCReg};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -18,7 +18,7 @@ const NUM_BALLS: usize = 4;
 pub fn main() {
     let mut vga = vga::new();
     vga.set_sc_data(SCReg::MapMask, 0x01);
-    vga.set_mem_chunk(
+    vga.write_mem_chunk(
         BALL_OFFSET,
         &vec![
             0x00, 0x3c, 0x00, 0x01, 0xff, 0x80, //
@@ -36,7 +36,7 @@ pub fn main() {
         ],
     );
     vga.set_sc_data(SCReg::MapMask, 0x02);
-    vga.set_mem_chunk(
+    vga.write_mem_chunk(
         BALL_OFFSET,
         &vec![
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
@@ -53,8 +53,8 @@ pub fn main() {
             0x01, 0xff, 0x80, 0x00, 0x3c, 0x00, //
         ],
     );
-    vga.set_sc_data(SCReg::MapMask, 0x03);
-    vga.set_mem_chunk(
+    vga.set_sc_data(SCReg::MapMask, 0x04);
+    vga.write_mem_chunk(
         BALL_OFFSET,
         &vec![
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //
@@ -71,8 +71,8 @@ pub fn main() {
             0x01, 0xff, 0x80, 0x00, 0x3c, 0x00, //
         ],
     );
-    vga.set_sc_data(SCReg::MapMask, 0x04);
-    vga.set_mem_chunk(
+    vga.set_sc_data(SCReg::MapMask, 0x08);
+    vga.write_mem_chunk(
         BALL_OFFSET,
         &vec![
             0x00, 0x3c, 0x00, 0x01, 0xff, 0x80, //
@@ -89,6 +89,17 @@ pub fn main() {
             0x01, 0xff, 0x80, 0x00, 0x3c, 0x00, //
         ],
     );
+    vga.set_sc_data(SCReg::MapMask, 0x0F);
+    for i in 0..(BALL_WIDTH * BALL_HEIGHT) {
+        vga.write_mem(BLANK_OFFSET + i, 0x00);
+    }
+
+    let mut gc_mode = vga.get_gc_data(GCReg::GraphicsMode);
+    gc_mode &= 0xFC;
+    gc_mode |= 0x01;
+    vga.set_gc_data(GCReg::GraphicsMode, gc_mode);
+
+    vga.set_crt_data(CRTReg::Offset, (LOGICAL_SCREEN_WIDTH / 2) as u8);
 
     screen::start_debug_planar_mode(Arc::new(vga));
 }
