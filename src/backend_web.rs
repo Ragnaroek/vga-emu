@@ -19,6 +19,7 @@ use crate::backend::render_planar;
 use crate::backend::set_de;
 use crate::backend::set_vr;
 use crate::{ VGA, Options };
+use crate::input::{InputMonitoring, Keyboard, NumCode};
 
 struct WebBuffer {
     data: Vec<u8>
@@ -26,6 +27,18 @@ struct WebBuffer {
 
 pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let document = web_sys::window().unwrap().document().unwrap();
+
+    if let Some(ref mon) = options.input_monitoring {
+        let mon_down = mon.clone();
+        let mon_up = mon.clone();
+        let keydown_handler : Closure::<dyn Fn(_)> = Closure::wrap(Box::new(move |e: web_sys::Event| handle_key(false, mon_down.clone(), e)));
+        let keyup_handler : Closure::<dyn Fn(_)> = Closure::wrap(Box::new(move |e: web_sys::Event| handle_key(true, mon_up.clone(), e)));
+        document.add_event_listener_with_callback("keydown", keydown_handler.as_ref().unchecked_ref()).expect("add keydown event");
+        document.add_event_listener_with_callback("keyup", keyup_handler.as_ref().unchecked_ref()).expect("add keyup event");    
+        keydown_handler.forget();
+        keyup_handler.forget();
+    }
+
     let canvas = document.get_element_by_id("vga").expect("canvas element with id 'vga' not found");
     let canvas: web_sys::HtmlCanvasElement = canvas
         .dyn_into::<web_sys::HtmlCanvasElement>()
@@ -94,8 +107,6 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
             set_de(&vga, false);
             task::sleep(Duration::ZERO).await;
 
-            // TODO Update inputs
-
             set_vr(&vga, true);
             task::sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
             set_vr(&vga, false);
@@ -112,6 +123,25 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
         }
     });
     Ok(())
+}
+
+fn handle_key(up: bool, input: InputMonitoring, event: web_sys::Event) {
+    let keyboard_event = event.dyn_into::<web_sys::KeyboardEvent>().expect("a KeyboardEvent");
+    let state = &mut *input.keyboard.lock().expect("keyboard lock");
+    let key = to_num_code(&keyboard_event.key());
+    state.buttons[key as usize] = !up;
+}
+
+fn to_num_code(key: &str) -> NumCode {
+    match key {
+        "ArrowUp" => NumCode::UpArrow,
+        "ArrowDown" => NumCode::DownArrow,
+        "ArrowLeft" => NumCode::LeftArrow,
+        "ArrowRight" => NumCode::RightArrow,
+        "Control" => NumCode::Control,
+        " " => NumCode::Space,
+        _ => NumCode::Bad,
+    }
 }
 
 impl PixelBuffer for WebBuffer {
