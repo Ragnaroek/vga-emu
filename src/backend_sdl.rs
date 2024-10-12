@@ -109,11 +109,7 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
 
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit { .. }
-                | Event::KeyDown {
-                    keycode: Some(Keycode::Escape),
-                    ..
-                } => break 'running,
+                Event::Quit { .. } => break 'running,
                 _ => {}
             }
 
