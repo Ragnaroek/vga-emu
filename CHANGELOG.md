@@ -4,6 +4,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+# [0.6.0]
+- last_scan in Keyboard
+- revised Mutex for InputMonitoring
+
 # [0.5.3]
 - SDL: Don't exit on ESC key press (has to be handled by the application)
 

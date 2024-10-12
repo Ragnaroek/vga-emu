@@ -1,5 +1,5 @@
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -9,7 +9,7 @@ use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::ttf;
 
-use crate::input::{InputMonitoring, Keyboard, NumCode};
+use crate::input::{InputMonitoring, NumCode};
 use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar, mem_offset};
 use crate::util::{get_width, get_height, set_de, set_vr};
 use crate::{ CRTReg, VGA, Options, FRAME_RATE_SAMPLES, DEBUG_HEIGHT, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO };
@@ -112,7 +112,6 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
                 Event::Quit { .. } => break 'running,
                 _ => {}
             }
-
             update_inputs(&options.input_monitoring, event);
         }
         //simulate vertical reset
@@ -155,26 +154,28 @@ impl PixelBuffer for [u8] { // TODO Use dedicated SDLBuffer here instead of [u8]
 
 // Input Stuff
 
-fn update_inputs(inputs: &Option<InputMonitoring>, event: Event) {
+fn update_inputs(inputs: &Option<Arc<Mutex<InputMonitoring>>>, event: Event) {
     if let Some(mon) = inputs {
-        let state = &mut *mon.keyboard.lock().unwrap();
+        let im = &mut *mon.lock().unwrap();
         match event {
-            Event::KeyUp { keycode, .. } => clear_key(keycode, state),
-            Event::KeyDown { keycode, .. } => set_key(keycode, state),
+            Event::KeyUp { keycode, .. } => clear_key(keycode, im),
+            Event::KeyDown { keycode, .. } => {set_key(keycode, im)},
             _ => {} //ignore
         }
     }
 }
 
-fn clear_key(keycode: Option<Keycode>, state: &mut Keyboard) {
+fn clear_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
     if let Some(code) = keycode {
-        state.buttons[to_num_code(code) as usize] = false;
+        state.keyboard.buttons[to_num_code(code) as usize] = false;
     }
 }
 
-fn set_key(keycode: Option<Keycode>, state: &mut Keyboard) {
+fn set_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
     if let Some(code) = keycode {
-        state.buttons[to_num_code(code) as usize] = true;
+        let num_code = to_num_code(code);
+        state.keyboard.last_scan = num_code;
+        state.keyboard.buttons[num_code as usize] = true;
     }
 }
 
