@@ -1,4 +1,4 @@
-use vga::{SCReg, GCReg};
+use super::{SCReg, GCReg, VGA, PLANE_SIZE};
 
 const SCREEN_WIDTH : usize = 80;
 const PATTERN_BUFFER : usize = 0xfffc;
@@ -6,11 +6,7 @@ const PATTERN_BUFFER : usize = 0xfffc;
 const LEFT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x0e, 0x0c, 0x08];
 const RIGHT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x01, 0x03, 0x07];
 
-pub fn main() {
-
-}
-
-pub fn fill_pattern_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, pattern: &[u8; 16]) {
+pub fn fill_pattern_x(vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, pattern: &[u8; 16]) {
 	
 	if end_x <= start_x || end_y <= start_y {
 		return;
@@ -47,7 +43,7 @@ pub fn fill_pattern_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: usi
 	for _ in 0..height {
 		let _ = vga.read_mem(si); //latch pattern
 		si += 1;
-		if si >= vga::PLANE_SIZE {
+		if si >= PLANE_SIZE {
 			si -= 4;
 		}
 		vga.set_sc_data(SCReg::MapMask, left_clip);
@@ -69,7 +65,7 @@ pub fn fill_pattern_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: usi
 	vga.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
-pub fn fill_rectangle_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, color: u8) {
+pub fn fill_rectangle_x(vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, color: u8) {
 	
 	if end_x <= start_x || end_y <= start_y {
 		return;
@@ -105,7 +101,7 @@ pub fn fill_rectangle_x(vga: &vga::VGA, start_x: usize, start_y: usize, end_x: u
 	}
 }
 
-pub fn copy_screen_to_screen_x(vga: &vga::VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize, dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize, src_bitmap_width: usize, dst_bitmap_width: usize) {
+pub fn copy_screen_to_screen_x(vga: &VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize, dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize, src_bitmap_width: usize, dst_bitmap_width: usize) {
 	vga.set_gc_data(GCReg::BitMask, 0);
 	
 	let dst_page_width = dst_bitmap_width >> 2;
@@ -150,7 +146,7 @@ pub fn copy_screen_to_screen_x(vga: &vga::VGA, src_start_x: usize, src_start_y: 
 }
 
 //TODO fix dst offset shifted by some pixel, why?
-pub fn copy_system_to_screen_masked_x(vga: &vga::VGA,
+pub fn copy_system_to_screen_masked_x(vga: &VGA,
 	src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize, 
 	dst_start_x: usize, dst_start_y: usize, 
 	source: &[u8], dst_page_base: usize, 
