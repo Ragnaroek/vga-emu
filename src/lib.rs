@@ -1,5 +1,6 @@
 pub mod screen;
 pub mod util;
+pub mod input;
 
 use std::sync::atomic::{AtomicU8, AtomicU16, Ordering};
 use std::sync::RwLock;
