@@ -88,8 +88,6 @@ pub fn main() {
 		}
 	});
 
-	//TODO read key, inc base_color, up to 8 times
-
 	let options: screen::Options = vga::screen::Options {
 		show_frame_rate: true,
 		..Default::default()
