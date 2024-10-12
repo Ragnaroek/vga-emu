@@ -10,7 +10,8 @@ use sdl2::rect::Rect;
 use sdl2::ttf;
 
 use crate::input::{InputMonitoring, Keyboard, NumCode};
-use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar, get_width, get_height, set_de, set_vr, mem_offset};
+use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar, mem_offset};
+use crate::util::{get_width, get_height, set_de, set_vr};
 use crate::{ CRTReg, VGA, Options, FRAME_RATE_SAMPLES, DEBUG_HEIGHT, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO };
 
 pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
