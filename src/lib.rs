@@ -258,8 +258,6 @@ impl VGA {
     pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
         self.mem[plane][offset].swap(v, Ordering::AcqRel);
     }
-
-
 }
 
 pub fn is_linear(vmode: u8) -> bool {
@@ -269,11 +267,7 @@ pub fn is_linear(vmode: u8) -> bool {
  //convenience functions
 
 pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
-    if is_linear(vga.get_video_mode()) {
-        vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/8) as u8);
-    } else {
-        vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/4) as u8);
-    }
+    vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/8) as u8);
 }
 
 pub fn set_vertical_display_end(vga: &VGA, height: u32) {
