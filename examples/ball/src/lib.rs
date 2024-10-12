@@ -1,10 +1,13 @@
 #![allow(clippy::comparison_chain)]
 
-//Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
+#[cfg(feature = "web")]
+pub mod web;
+
+/// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
+
 use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, Instant};
-use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
+use vga::{CRTReg, GCReg, SCReg, AttributeReg};
+use vga::util::{display_enable, vsync, spawn_task};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -16,9 +19,6 @@ const BALL_HEIGHT: usize = 24; //height of ball in scan lines
 const BLANK_OFFSET: usize = PAGE1_OFFSET * 2; //start of blank image in VGA memory
 const BALL_OFFSET: usize = BLANK_OFFSET + (BALL_WIDTH * BALL_HEIGHT); //start offset of ball image in VGA memory
 const NUM_BALLS: usize = 4;
-
-const VSYNC_MASK: u8 = 0x08;
-const DE_MASK: u8 = 0x01;
 
 const BALL_0_CONTROL: [i16; 13] = [10, 1, 4, 10, -1, 4, 10, -1, -4, 10, 1, -4, 0];
 const BALL_1_CONTORL: [i16; 13] = [12, -1, 1, 28, -1, -1, 12, 1, -1, 28, 1, 1, 0];
@@ -32,9 +32,6 @@ const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
 ];
 const PANNING_CONTROL_STRING : [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
 
-const UPDATE_RATE_SAMPLES: usize = 1000;
-const POLL_WAIT_MICROS : u64 = 500;
-
 struct PanningState {
     hpan: i16,
     panning_rep: i16,
@@ -42,6 +39,21 @@ struct PanningState {
     panning_y_inc: i16,
     panning_start_offset: usize,
     panning_control: usize,
+}
+struct RenderState {
+    ball_x: [usize; 4],
+    ball_y: [usize; 4],
+    last_ball_x: [usize; 4],
+    last_ball_y: [usize; 4],
+    ball_x_inc: [i16; 4],
+    ball_y_inc: [i16; 4],
+    ball_rep: [i16; 4],
+    ball_control: [usize; 4],
+    
+    current_page: usize,
+    current_page_offset: usize,
+
+    panning_state: PanningState,
 }
 
 fn initial_panning_state() -> PanningState {
@@ -55,8 +67,23 @@ fn initial_panning_state() -> PanningState {
     }
 }
 
+fn initial_render_state() -> RenderState {
+    RenderState { 
+        ball_x: [15, 50, 40, 70],
+        ball_y: [40, 200, 110, 300], 
+        last_ball_x: [15, 50, 40, 70], 
+        last_ball_y: [40, 200, 110, 300], 
+        ball_x_inc: [1, 1, 1, 1], 
+        ball_y_inc: [8, 8, 8, 8], 
+        ball_rep: [1, 1, 1, 1], 
+        ball_control: [0, 0, 0, 0], 
+        current_page: PAGE1, 
+        current_page_offset: PAGE1_OFFSET, 
+        panning_state: initial_panning_state(), 
+    }
+}
 
-pub fn main() {
+pub fn start_ball() {
     let vga = vga::new(0x10);
 
     draw_border(&vga, PAGE0_OFFSET);
@@ -149,88 +176,69 @@ pub fn main() {
     let vga_m = Arc::new(vga);
     let vga_t = vga_m.clone();
 
-    thread::spawn(move || {
-        let mut ball_x = [15, 50, 40, 70];
-        let mut ball_y = [40, 200, 110, 300];
-        let mut last_ball_x = [15, 50, 40, 70];
-        let mut last_ball_y = [40, 200, 110, 300];
-        let mut ball_x_inc = [1, 1, 1, 1];
-        let mut ball_y_inc = [8, 8, 8, 8];
-        let mut ball_rep = [1, 1, 1, 1];
-        let mut ball_control = [0, 0, 0, 0];
-        
-        let mut current_page = PAGE1;
-        let mut current_page_offset = PAGE1_OFFSET;
-
-        let mut panning_state = initial_panning_state();
-
-        let mut updates = Vec::with_capacity(UPDATE_RATE_SAMPLES);
-        for _ in 0..UPDATE_RATE_SAMPLES {
-            updates.push(Instant::now());
-        }
-
+    let mut state = initial_render_state();
+    spawn_task(async move {
         loop {
-            web_sys::console::log_1(&format!("### rendering loop").into());
-
             for bx in (0..NUM_BALLS).rev() {
                 draw_ball(
                     &vga_t,
                     BLANK_OFFSET,
-                    current_page_offset,
-                    last_ball_x[bx],
-                    last_ball_y[bx],
+                    state.current_page_offset,
+                    state.last_ball_x[bx],
+                    state.last_ball_y[bx],
                 );
 
-                let mut ax = ball_x[bx];
-                last_ball_x[bx] = ax;
-                ax = ball_y[bx];
-                last_ball_y[bx] = ax;
+                let mut ax = state.ball_x[bx];
+                state.last_ball_x[bx] = ax;
+                ax = state.ball_y[bx];
+                state.last_ball_y[bx] = ax;
 
-                ball_rep[bx] -= 1;
-                if ball_rep[bx] == 0 {
+                state.ball_rep[bx] -= 1;
+                if state.ball_rep[bx] == 0 {
                     //repeat factor run out, reset it
-                    let mut bc_ptr = ball_control[bx];
+                    let mut bc_ptr = state.ball_control[bx];
                     if BALL_CONTROL_STRING[bx][bc_ptr] == 0 {
                         bc_ptr = 0;
                     }
-                    ball_rep[bx] = BALL_CONTROL_STRING[bx][bc_ptr];
-                    ball_x_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 1];
-                    ball_y_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 2];
+                    state.ball_rep[bx] = BALL_CONTROL_STRING[bx][bc_ptr];
+                    state.ball_x_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 1];
+                    state.ball_y_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 2];
 
-                    ball_control[bx] = bc_ptr + 3;
+                    state.ball_control[bx] = bc_ptr + 3;
                 }
 
-                ball_x[bx] = (ball_x[bx] as i16 + ball_x_inc[bx]) as usize;
-                ball_y[bx] = (ball_y[bx] as i16 + ball_y_inc[bx]) as usize;
+                state.ball_x[bx] = (state.ball_x[bx] as i16 + state.ball_x_inc[bx]) as usize;
+                state.ball_y[bx] = (state.ball_y[bx] as i16 + state.ball_y_inc[bx]) as usize;
 
                 draw_ball(
                     &vga_t,
                     BALL_OFFSET,
-                    current_page_offset,
-                    ball_x[bx],
-                    ball_y[bx],
+                    state.current_page_offset,
+                    state.ball_x[bx],
+                    state.ball_y[bx],
                 );
             }
 
-            adjust_panning(&mut panning_state);
+            adjust_panning(&mut state.panning_state);
             
-            wait_display_enable(&vga_t);
+            //web_sys::console::log_1(&format!("wait for display_enable").into()); 
+            display_enable(&vga_t).await; 
 
             // Flip to new page by setting new start adress
-            let addr_parts = (current_page_offset + panning_state.panning_start_offset).to_le_bytes();
+            let addr_parts = (state.current_page_offset + state.panning_state.panning_start_offset).to_le_bytes();
             vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
             vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
-            
-            wait_vsync(&vga_t);
 
-            vga_t.set_attribute_reg(AttributeReg::HorizontalPixelPanning, panning_state.hpan as u8);
+            vsync(&vga_t).await; 
+
+            vga_t.set_attribute_reg(AttributeReg::HorizontalPixelPanning, state.panning_state.hpan as u8);
             
-            //flip pages for next loop
-            current_page ^= 1;
-            if current_page == 0 {
-                current_page_offset = PAGE0_OFFSET;
+            // Flip pages for next loop
+            state.current_page ^= 1;
+            if state.current_page == 0 {
+                state.current_page_offset = PAGE0_OFFSET;
             } else {
-                current_page_offset = PAGE1_OFFSET
+                state.current_page_offset = PAGE1_OFFSET
             }
         }
     });
@@ -238,13 +246,14 @@ pub fn main() {
     let options : vga::Options = vga::Options { show_frame_rate: true, ..Default::default() };
     /*
     enable this for debugging:
-    screen::start_debug_planar_mode(
+    vga_m.start_debug_planar_mode(
         vga_m,
         672,
         780,
         options, 
     ).unwrap();*/
     vga_m.start(options).unwrap();
+
 }
 
 fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
@@ -351,25 +360,5 @@ fn adjust_panning(state : &mut PanningState) {
     } else if state.panning_y_inc > 0 {
         //pan down
         state.panning_start_offset += LOGICAL_SCREEN_WIDTH;
-    }
-}
-
-fn wait_display_enable(vga: &Arc<vga::VGA>) {
-    loop {
-        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
-        if in1 & DE_MASK == 0 {
-            break;
-        }
-        thread::sleep(Duration::from_micros(POLL_WAIT_MICROS));
-    }
-}
-
-fn wait_vsync(vga: &Arc<vga::VGA>) {
-    loop {
-        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
-        if in1 & VSYNC_MASK != 0 {
-            break;
-        }
-        thread::sleep(Duration::from_micros(POLL_WAIT_MICROS));
     }
 }

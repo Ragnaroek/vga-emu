@@ -1,5 +1,6 @@
 pub mod util;
 pub mod input;
+pub mod backend;
 #[cfg(feature = "sdl")]
 pub mod backend_sdl;
 #[cfg(feature = "web")]
@@ -7,11 +8,6 @@ pub mod backend_web;
 
 use std::sync::atomic::{AtomicU8, AtomicU16, Ordering, AtomicU64};
 use std::sync::{RwLock, Arc};
-
-#[cfg(feature = "sdl")]
-use backend_sdl::start_sdl;
-#[cfg(feature = "web")]
-use backend_web::start_web;
 use input::InputMonitoring;
 
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
@@ -56,7 +52,7 @@ pub struct VGA {
     color_write_reads: AtomicU16,
     palette_256: RwLock<[u32; 256]>,
 
-    mem: Vec<Vec<AtomicU8>>,
+    pub mem: Vec<Vec<AtomicU8>>,
 }
 
 pub fn new(video_mode: u8) -> VGA {
@@ -213,17 +209,17 @@ pub enum ColorReg {
 }
 
 impl VGA {
-    pub fn start(&self, options: Options) -> Result<(), String> {
+    pub fn start(self: Arc<Self>, options: Options) -> Result<(), String> {
         #[cfg(feature = "sdl")]
-        return start_sdl(self, options);
+        return backend_sdl::start_sdl(self, options);
         #[cfg(feature = "web")]
-        return start_web(self, options);
+        return backend_web::start_web(self, options);
     }
 
     /// Shows the full content of the VGA buffer as one big screen (for debugging) for
     /// the planar modes. width and height depends on your virtual screen size (640x819 if
     /// you did not change the default settings)
-    pub fn start_debug_planar_mode(&self, w: usize, h: usize, options: Options) -> Result<(), String> {
+    pub fn start_debug_planar_mode(self: Arc<Self>, w: usize, h: usize, options: Options) -> Result<(), String> {
         let mut debug_options = options;
         debug_options.start_addr_override = Some(0);
 
@@ -383,10 +379,6 @@ impl VGA {
     pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
         self.mem[plane][offset].swap(v, Ordering::AcqRel);
     }
-}
-
-pub fn is_linear(vmode: u8) -> bool {
-    vmode == 0x13
 }
 
 fn init_default_256_palette() -> [u32; 256] {

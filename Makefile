@@ -1,2 +1,5 @@
 web:
-	wasm-pack build --target web -- --features web
+	wasm-pack build --debug --target web -- --features web
+
+sdl:
+	cargo build --features sdl

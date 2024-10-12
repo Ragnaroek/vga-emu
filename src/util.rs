@@ -1,5 +1,10 @@
-use crate::{GeneralReg, CRTReg, Options};
+// Provides various utils for implementing something with the VGA
 
+use std::future::Future;
+use std::time::Duration;
+use async_std::task::{self, JoinHandle};
+
+use crate::GeneralReg;
 use crate::{SCReg, GCReg, VGA, PLANE_SIZE};
 
 const SCREEN_WIDTH : usize = 80;
@@ -8,65 +13,52 @@ const PATTERN_BUFFER : usize = 0xfffc;
 const LEFT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x0e, 0x0c, 0x08];
 const RIGHT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x01, 0x03, 0x07];
 
-const CLEAR_VR_MASK: u8 = 0b11110111;
-const CLEAR_DE_MASK: u8 = 0b11111110;
+const VSYNC_MASK: u8 = 0x08;
+const DE_MASK: u8 = 0x01;
 
-// vertical retrace
-pub fn set_vr(vga: &VGA, set: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
-    if set {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
-    } else {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
+const POLL_WAIT_MICROS : u64 = 500;
+
+#[cfg(feature = "sdl")]
+pub fn spawn_task<F, T>(future: F) -> JoinHandle<T>
+where
+    F: Future<Output = T> + Send + 'static,
+    T: Send + 'static,
+{
+	task::spawn(future)
+}
+
+#[cfg(feature = "web")]
+pub fn spawn_task<F, T>(future: F) -> JoinHandle<T>
+where
+    F: Future<Output = T> + 'static,
+    T: 'static,
+{
+    task::spawn_local(future)
+}
+
+// wait routines
+
+pub async fn display_enable(vga: &VGA) {
+    loop {
+        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if in1 & DE_MASK == 0 {
+            break;
+        }
+		task::sleep(Duration::from_micros(POLL_WAIT_MICROS)).await; 
     }
 }
 
-// display enable NOT
-pub fn set_de(vga: &VGA, display_mode: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
-    if display_mode {
-        //flag needs to be set to zero (NOT)
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
-    } else {
-        //not in display mode (vertical or horizontal retrace), set to 1
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
+pub async fn vsync(vga: &VGA) {
+    loop {
+        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if in1 & VSYNC_MASK != 0 {
+            break;
+        }
+		task::sleep(Duration::from_micros(POLL_WAIT_MICROS)).await; 
     }
 }
-
-//width in pixel
-pub fn get_width(vga: &VGA) -> u32 {
-    (vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
-}
-
-pub fn get_height(vga: &VGA) -> u32 {
-    get_vertical_display_end(&vga) + 1
-}
-
-//Constructs the Vertical Display End from the register + offset register
-fn get_vertical_display_end(vga: &VGA) -> u32 {
-    let vde_lower = vga.get_crt_data(CRTReg::VerticalDisplayEnd);
-    let overflow = vga.get_crt_data(CRTReg::Overflow);
-    let vde_bit_8 = (overflow & 0b0000_0010) >> 1;
-    let vde_bit_9 = (overflow & 0b0100_0000) >> 5;
-    let vde_upper = vde_bit_8 | vde_bit_9;
-    let vde = vde_lower as u32;
-    vde | ((vde_upper as u32) << 8)
-}
-
-pub fn mem_offset(vga: &VGA, options: &Options) -> usize {
-    if let Some(over) = options.start_addr_override {
-        return over;
-    }
-    let low = vga.get_crt_data(CRTReg::StartAdressLow) as u16;
-    let mut addr = vga.get_crt_data(CRTReg::StartAdressHigh) as u16;
-    addr <<= 8;
-    addr |= low;
-    addr as usize
-}
-
 
 /// Drawing helper
-
 
 pub fn fill_pattern_x(vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, pattern: &[u8; 16]) {
 	if end_x <= start_x || end_y <= start_y {
@@ -127,7 +119,6 @@ pub fn fill_pattern_x(vga: &VGA, start_x: usize, start_y: usize, end_x: usize, e
 }
 
 pub fn fill_rectangle_x(vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize, color: u8) {
-	
 	if end_x <= start_x || end_y <= start_y {
 		return;
 	}
