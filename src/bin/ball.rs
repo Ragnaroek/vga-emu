@@ -1,5 +1,5 @@
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use std::thread;
 use std::time::Duration;
 use vga::screen;
@@ -121,8 +121,8 @@ pub fn main() {
     gc_mode |= 0x01;
     vga.set_gc_data(GCReg::GraphicsMode, gc_mode);
 
-    let vga_lock = Arc::new(RwLock::new(vga));
-    let vga_t = vga_lock.clone();
+    let vga_m = Arc::new(vga);
+    let vga_t = vga_m.clone();
 
     thread::spawn(move || {
         let mut ball_x = [15, 50, 40, 70];
@@ -136,9 +136,8 @@ pub fn main() {
 
         loop {
             {
-                let mut vga = vga_t.write().unwrap();
                 for bx in (0..NUM_BALLS).rev() {
-                    draw_ball(&mut vga, BLANK_OFFSET, last_ball_x[bx], last_ball_y[bx]);
+                    draw_ball(&vga_t, BLANK_OFFSET, last_ball_x[bx], last_ball_y[bx]);
 
                     let mut ax = ball_x[bx];
                     last_ball_x[bx] = ax;
@@ -162,7 +161,7 @@ pub fn main() {
                     ball_x[bx] = (ball_x[bx] as i16 + ball_x_inc[bx]) as usize;
                     ball_y[bx] = (ball_y[bx] as i16 + ball_y_inc[bx]) as usize;
 
-                    draw_ball(&mut vga, BALL_OFFSET, ball_x[bx], ball_y[bx]);
+                    draw_ball(&vga_t, BALL_OFFSET, ball_x[bx], ball_y[bx]);
                 }
             }
 
@@ -175,10 +174,10 @@ pub fn main() {
         }
     });
 
-    screen::start_debug_planar_mode(vga_lock, 672, 780);
+    screen::start_debug_planar_mode(vga_m, 672, 780);
 }
 
-fn draw_ball(vga: &mut vga::VGA, src_offset: usize, x: usize, y: usize) {
+fn draw_ball(vga: &vga::VGA, src_offset: usize, x: usize, y: usize) {
     let offset = y * LOGICAL_SCREEN_WIDTH + x; //TODO add CurrentPageOffset (once frame buffers are implemented)
     let mut si = src_offset;
     let mut di = offset;
@@ -194,7 +193,7 @@ fn draw_ball(vga: &mut vga::VGA, src_offset: usize, x: usize, y: usize) {
     }
 }
 
-fn draw_border(vga: &mut vga::VGA, offset: usize) {
+fn draw_border(vga: &vga::VGA, offset: usize) {
     let mut di = offset;
     //left border
     for _ in 0..(LOGICAL_SCREEN_HEIGHT / 16) {
@@ -237,7 +236,7 @@ fn draw_border(vga: &mut vga::VGA, offset: usize) {
     }
 }
 
-fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
+fn draw_border_block(vga: &vga::VGA, offset: usize) {
     let mut di = offset;
     for _ in 0..8 {
         vga.write_mem(di, 0xff);
@@ -245,9 +244,8 @@ fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
     }
 }
 
-fn wait_display_enable(vga_t: &Arc<RwLock<vga::VGA>>) {
+fn wait_display_enable(vga: &Arc<vga::VGA>) {
     loop {
-        let vga = vga_t.read().unwrap();
         let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
         if in1 & DE_MASK == 0 {
             break;
@@ -255,9 +253,8 @@ fn wait_display_enable(vga_t: &Arc<RwLock<vga::VGA>>) {
     } 
 }
 
-fn wait_vsync(vga_t: &Arc<RwLock<vga::VGA>>) {
+fn wait_vsync(vga: &Arc<vga::VGA>) {
     loop {
-        let vga = vga_t.read().unwrap();
         let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
         if in1 & VSYNC_MASK != 0 {
             break;
