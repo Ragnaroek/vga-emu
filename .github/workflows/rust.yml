@@ -22,7 +22,7 @@ jobs:
         toolchain: stable
         override: true
     - name: Install SDL
-      run: sudo apt-get install libsdl2-dev
+      run: sudo apt-get install libsdl2-dev libsdl2-ttf-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
