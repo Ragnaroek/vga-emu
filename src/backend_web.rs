@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use async_std::task;
 
@@ -118,11 +118,11 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     Ok(())
 }
 
-fn handle_key(up: bool, input: InputMonitoring, event: web_sys::Event) {
+fn handle_key(up: bool, input: Arc<Mutex<InputMonitoring>>, event: web_sys::Event) {
     let keyboard_event = event.dyn_into::<web_sys::KeyboardEvent>().expect("a KeyboardEvent");
-    let state = &mut *input.keyboard.lock().expect("keyboard lock");
     let key = to_num_code(&keyboard_event.key());
-    state.buttons[key as usize] = !up;
+    let mut mon = input.lock().expect("keyboard lock");
+    mon.keyboard.buttons[key as usize] = !up;
 }
 
 fn to_num_code(key: &str) -> NumCode {
