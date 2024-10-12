@@ -226,14 +226,15 @@ impl VGA {
         if reg == ColorReg::Data {
             let writes = self.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressWriteMode) as usize;
-            let color_part_shift = (2 - (writes % 3)) * 8;           
+            let color_part_shift = (2 - writes) * 8;           
             
             let mut table = self.palette_256.write().unwrap();
             table[ix] &= !((0xFF as u32) << color_part_shift);
             table[ix] |= ((v & 0x3F) as u32) << color_part_shift;
-            
-            if (writes+1) % 3 == 0 {
+          
+            if writes == 2 {
                 self.color_reg[ColorReg::AddressWriteMode as usize].fetch_add(1, Ordering::AcqRel);
+                self.color_write_reads.store(0, Ordering::Relaxed);
             }
         }
     }
@@ -242,12 +243,13 @@ impl VGA {
         if reg == ColorReg::Data {
             let reads = self.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressReadMode) as usize;
-            let color_part_shift = (2 - (reads % 3)) * 8;
+            let color_part_shift = (2 - reads) * 8;
             let color = self.get_color_palette_256(ix);
             let word = color & (0xFF as u32) << color_part_shift;      
              
-            if (reads+1) % 3 == 0 {
+            if reads == 2 {
                 self.color_reg[ColorReg::AddressReadMode as usize].fetch_add(1, Ordering::AcqRel);
+                self.color_write_reads.store(0, Ordering::Relaxed);
             }
             (word >> color_part_shift) as u8
         } else {
