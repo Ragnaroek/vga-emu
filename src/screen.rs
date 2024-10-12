@@ -12,19 +12,24 @@ use super::{CRTReg, GeneralReg, VGA};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
 const CLEAR_DE_MASK: u8 = 1;
-const TARGET_FRAME_RATE_MICRO: u128 = 1000_000 / 60;
+pub const TARGET_FRAME_RATE_MICRO: u128 = 1000_000 / 60;
+pub const VERTICAL_RESET_MICRO : u64 = 635;
 
 const DEBUG_HEIGHT: u32 = 20;
 const FRAME_RATE_SAMPLES: usize = 100;
 
+#[derive(Clone, Copy)]
 pub struct Options {
     pub show_frame_rate: bool,
+    pub start_addr_override: Option<usize>,
 }
 
 impl Default for Options {
     fn default() -> Self {
         Options {
             show_frame_rate: false,
+            //set in debug mode to ignore the start adress set in the vga
+            start_addr_override: None,
         }
     }
 }
@@ -47,7 +52,9 @@ pub fn start_debug_planar_mode(
     h: u32,
     options: Options,
 ) -> Result<(), String> {
-    start_video(vga, w, h, options)
+    let mut debug_options = options.clone();
+    debug_options.start_addr_override = Some(0);
+    start_video(vga, w, h, debug_options)
 }
 
 fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), String> {
@@ -101,12 +108,11 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
     }
 
     'running: loop {
-        let mut mem_offset = 0;
+        let mut mem_offset = mem_offset(&vga, &options);
         let mut x: usize = 0;
         let mut y: usize = 0;
         let frame_start = Instant::now();
-        //set VR to 0
-        set_vr(&vga, false);
+        
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             for _ in 0..(h as usize) {
                 //set DE to 0
@@ -173,7 +179,11 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
         }
 
         set_de(&vga, true);
+        
+        //simulate vertical reset
         set_vr(&vga, true);
+        sleep(Duration::from_micros(VERTICAL_RESET_MICRO));
+        set_vr(&vga, false);
 
         let v_elapsed = frame_start.elapsed().as_micros();
         if v_elapsed < TARGET_FRAME_RATE_MICRO {
@@ -192,9 +202,21 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
         fr_buffer_vsync[fr_ix_vsync] = v_elapsed_vsync;
         fr_sum_vsync += v_elapsed_vsync;
         fr_vsync = 1_000_000 / (fr_sum_vsync / (FRAME_RATE_SAMPLES as u128));
+        
     }
 
     return Ok(());
+}
+
+fn mem_offset(vga: &VGA, options: &Options) -> usize {
+    if let Some(over) = options.start_addr_override {
+        return over;
+    }
+    let low = vga.get_crt_data(CRTReg::StartAdressLow) as u16;
+    let mut addr = vga.get_crt_data(CRTReg::StartAdressHigh) as u16;
+    addr <<= 8;
+    addr |= low;
+    return addr as usize;
 }
 
 fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
