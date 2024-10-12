@@ -1,6 +1,6 @@
 extern crate vgaemu;
 
-use vgaemu::{GCReg, SCReg, PLANE_SIZE, set_horizontal_display_end, set_vertical_display_end};
+use vgaemu::{GCReg, SCReg, ColorReg, PLANE_SIZE, set_horizontal_display_end, set_vertical_display_end};
 use vgaemu::screen::{get_width, get_height};
 
 #[test]
@@ -130,4 +130,23 @@ fn test_set_and_get_vertical_display_end() {
 
     set_vertical_display_end(&vga, 1024);
     assert_eq!(get_height(&vga), 1024);
+}
+
+#[test]
+fn test_set_color() {
+    let vga = vgaemu::new(0x10);
+    vga.set_color_reg(ColorReg::AddressWriteMode, 0);
+
+    for i in 0..3 {
+        assert_eq!(vga.get_color_reg(ColorReg::AddressWriteMode), 0);
+        vga.set_color_reg(ColorReg::Data, 0x3F - i);
+    }
+
+    assert_eq!(vga.get_color_reg(ColorReg::AddressWriteMode), 1);
+    println!("hex = {:x}", vga.get_color_palette_256(0));
+    assert_eq!(vga.get_color_palette_256(0), 0x3F3E3D);
+
+    //TODO Write colors here
+    //check auto-increment
+    //check state register set to 0b11
 }
