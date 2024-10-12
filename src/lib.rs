@@ -1,3 +1,4 @@
+
 pub mod screen;
 
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -192,7 +193,7 @@ impl VGA {
     }
 
     /// Shortcut for setting a chunk of memory.
-    pub fn write_mem_chunk(&self, offset: usize, v: &Vec<u8>) {
+    pub fn write_mem_chunk(&self, offset: usize, v: &[u8]) {
         for (i, v) in v.iter().enumerate() {
             self.write_mem(offset + i, *v);
         }
@@ -207,6 +208,6 @@ impl VGA {
     }
 
     pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
-        return self.mem[plane][offset].load(Ordering::Relaxed);
+        self.mem[plane][offset].load(Ordering::Relaxed)
     }
 }
