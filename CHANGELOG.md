@@ -4,6 +4,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+# [0.5.2]
+- sdl2 0.36.0
+
 # [0.5.0]
 - web support 
 
