@@ -1,10 +1,10 @@
-web:
+build-web:
 	wasm-pack build --debug --target web -- --features web
 
-sdl:
+build-sdl:
 	cargo build --features sdl
 
-test:
+test-all:
 	cargo test --features sdl
 	cargo test --features web
 
