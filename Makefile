@@ -4,9 +4,9 @@ build-web:
 build-sdl:
 	cargo build --features sdl
 
-test-all:
+# integration tests with web are currently not possible, at least compile web for testing
+test-all: build-web
 	cargo test --features sdl
-	cargo test --features web
 
 publish:
 	cargo publish --features sdl

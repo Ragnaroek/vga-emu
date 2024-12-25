@@ -27,6 +27,7 @@ impl InputMonitoring {
     }
 }
 
+// TODO convert to InputMonitoring::new()
 pub fn new_input_monitoring() -> InputMonitoring {
     let keyboard = Keyboard {
         last_scan: NumCode::None,

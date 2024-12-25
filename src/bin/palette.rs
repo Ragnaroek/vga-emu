@@ -1,18 +1,17 @@
 use std::env;
 use std::fs;
-use std::io;
 use std::sync::Arc;
 
 use vga::util;
-use vga::{ColorReg, SCReg};
+use vga::{ColorReg, SCReg, VGA};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 200;
 const CUBE_SIZE: usize = 10;
 const PALETTE_SIZE: usize = 16;
 
-fn main() -> io::Result<()> {
-    let vga = vga::new(0x13);
+fn main() -> Result<(), String> {
+    let (vga, handle) = VGA::setup(0x13, false)?;
 
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -20,7 +19,7 @@ fn main() -> io::Result<()> {
 
     let mut args = env::args();
     if args.len() == 2 {
-        let palette = fs::read(args.nth(1).unwrap())?;
+        let palette = fs::read(args.nth(1).unwrap()).map_err(|e| e.to_string())?;
         set_palette(&vga, &palette);
     }
 
@@ -52,7 +51,8 @@ fn main() -> io::Result<()> {
         show_frame_rate: true,
         ..Default::default()
     };
-    vga_m.start(options).unwrap();
+    let handle_ref = Arc::new(handle);
+    vga_m.start(handle_ref, options).unwrap();
     Ok(())
 }
 

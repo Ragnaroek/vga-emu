@@ -4,7 +4,7 @@ use async_std::task::{self, JoinHandle};
 use std::future::Future;
 use std::time::Duration;
 
-use crate::{CRTReg, GeneralReg};
+use crate::{CRTReg, GeneralReg, VGARegs};
 use crate::{GCReg, SCReg, PLANE_SIZE, VGA};
 
 const SCREEN_WIDTH: usize = 80;
@@ -43,7 +43,7 @@ where
 
 pub async fn display_enable(vga: &VGA) {
     loop {
-        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
         if in1 & DE_MASK == 0 {
             break;
         }
@@ -53,7 +53,7 @@ pub async fn display_enable(vga: &VGA) {
 
 pub async fn vsync(vga: &VGA) {
     loop {
-        let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
+        let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
         if in1 & VSYNC_MASK != 0 {
             break;
         }
@@ -62,18 +62,27 @@ pub async fn vsync(vga: &VGA) {
 }
 
 /// width in pixel
+
+pub fn get_width_regs(regs: &VGARegs) -> u32 {
+    (regs.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
+}
+
 pub fn get_width(vga: &VGA) -> u32 {
-    (vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
+    get_width_regs(&vga.regs)
+}
+
+pub fn get_height_regs(regs: &VGARegs) -> u32 {
+    get_vertical_display_end(regs) + 1
 }
 
 pub fn get_height(vga: &VGA) -> u32 {
-    get_vertical_display_end(&vga) + 1
+    get_height_regs(&vga.regs)
 }
 
 /// Constructs the Vertical Display End from the register + offset register
-fn get_vertical_display_end(vga: &VGA) -> u32 {
-    let vde_lower = vga.get_crt_data(CRTReg::VerticalDisplayEnd);
-    let overflow = vga.get_crt_data(CRTReg::Overflow);
+fn get_vertical_display_end(regs: &VGARegs) -> u32 {
+    let vde_lower = regs.get_crt_data(CRTReg::VerticalDisplayEnd);
+    let overflow = regs.get_crt_data(CRTReg::Overflow);
     let vde_bit_8 = (overflow & 0b0000_0010) >> 1;
     let vde_bit_9 = (overflow & 0b0100_0000) >> 5;
     let vde_upper = vde_bit_8 | vde_bit_9;
@@ -83,23 +92,27 @@ fn get_vertical_display_end(vga: &VGA) -> u32 {
 
 /// display enable NOT
 pub fn set_de(vga: &VGA, display_mode: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+    let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if display_mode {
         //flag needs to be set to zero (NOT)
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
+        vga.regs
+            .set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
     } else {
         //not in display mode (vertical or horizontal retrace), set to 1
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
+        vga.regs
+            .set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
     }
 }
 
 /// vertical retrace
 pub fn set_vr(vga: &VGA, set: bool) {
-    let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+    let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if set {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
+        vga.regs
+            .set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK);
     } else {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
+        vga.regs
+            .set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
     }
 }
 
@@ -114,19 +127,19 @@ pub fn fill_pattern_x(
     }
 
     for i in 0..4 {
-        vga.set_sc_data(SCReg::MapMask, 1);
+        vga.regs.set_sc_data(SCReg::MapMask, 1);
         vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4]);
 
-        vga.set_sc_data(SCReg::MapMask, 2);
+        vga.regs.set_sc_data(SCReg::MapMask, 2);
         vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 1]);
 
-        vga.set_sc_data(SCReg::MapMask, 4);
+        vga.regs.set_sc_data(SCReg::MapMask, 4);
         vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 2]);
 
-        vga.set_sc_data(SCReg::MapMask, 8);
+        vga.regs.set_sc_data(SCReg::MapMask, 8);
         vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 3]);
     }
-    vga.set_gc_data(GCReg::BitMask, 0);
+    vga.regs.set_gc_data(GCReg::BitMask, 0);
 
     let mut si = (start_y & 0x03) + (PATTERN_BUFFER - 1);
     let mut di = start_y * SCREEN_WIDTH + (start_x >> 2) + page_base;
@@ -147,23 +160,23 @@ pub fn fill_pattern_x(
         if si >= PLANE_SIZE {
             si -= 4;
         }
-        vga.set_sc_data(SCReg::MapMask, left_clip);
+        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
         vga.write_mem(di, 0x00);
 
         if width > 0 {
-            vga.set_sc_data(SCReg::MapMask, 0x0F);
+            vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
             for w in 0..(width - 1) {
                 vga.write_mem(di + (w + 1), 0x00);
             }
 
-            vga.set_sc_data(SCReg::MapMask, right_clip);
+            vga.regs.set_sc_data(SCReg::MapMask, right_clip);
             vga.write_mem(di + width, 0x00);
         }
 
         di += SCREEN_WIDTH;
     }
 
-    vga.set_gc_data(GCReg::BitMask, 0xFF);
+    vga.regs.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
 pub fn fill_rectangle_x(
@@ -187,16 +200,16 @@ pub fn fill_rectangle_x(
     }
 
     for _ in 0..height {
-        vga.set_sc_data(SCReg::MapMask, left_clip);
+        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
         vga.write_mem(di, color);
 
         if width > 0 {
-            vga.set_sc_data(SCReg::MapMask, 0x0F);
+            vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
             for w in 0..(width - 1) {
                 vga.write_mem(di + (w + 1), color);
             }
 
-            vga.set_sc_data(SCReg::MapMask, right_clip);
+            vga.regs.set_sc_data(SCReg::MapMask, right_clip);
             vga.write_mem(di + width, color);
         }
 
@@ -209,7 +222,7 @@ pub fn copy_screen_to_screen_x(
     dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize,
 ) {
-    vga.set_gc_data(GCReg::BitMask, 0);
+    vga.regs.set_gc_data(GCReg::BitMask, 0);
 
     let dst_page_width = dst_bitmap_width >> 2;
     let mut di = (dst_page_width * dst_start_y) + (dst_start_x >> 2) + dst_page_base;
@@ -227,13 +240,13 @@ pub fn copy_screen_to_screen_x(
     let dst_next_offset = dst_page_width - width_bytes;
 
     for _ in 0..src_height {
-        vga.set_sc_data(SCReg::MapMask, left_clip);
+        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
         let _ = vga.read_mem(si);
         vga.write_mem(di, 0x00);
         si += 1;
         di += 1;
 
-        vga.set_sc_data(SCReg::MapMask, 0x0F);
+        vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
         for _ in 0..(width_bytes - 1) {
             let _ = vga.read_mem(si);
             vga.write_mem(di, 0x00);
@@ -241,7 +254,7 @@ pub fn copy_screen_to_screen_x(
             di += 1;
         }
 
-        vga.set_sc_data(SCReg::MapMask, right_clip);
+        vga.regs.set_sc_data(SCReg::MapMask, right_clip);
         let _ = vga.read_mem(si);
         vga.write_mem(di + width_bytes, 0x00);
         si += 1;
@@ -271,7 +284,7 @@ pub fn copy_system_to_screen_masked_x(
         let mut plane = di & 0b11;
         for _ in 0..width_bytes {
             if mask[si] != 0 {
-                vga.set_sc_data(SCReg::MapMask, 1 << plane);
+                vga.regs.set_sc_data(SCReg::MapMask, 1 << plane);
                 vga.write_mem(ix, source[si]);
             }
             if plane == 3 {

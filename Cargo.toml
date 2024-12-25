@@ -40,9 +40,10 @@ web-sys = { version = "0.3.72", optional = true, features = [
     'console',
 ] }
 
-[[bin]]
-name = "ball"
-path = "src/bin/ball.rs"
+[[test]]
+name = "integrationTestsSDL"
+path = "tests/integration_sdl.rs"
+harness = false
 
 [[bin]]
 name = "kite"

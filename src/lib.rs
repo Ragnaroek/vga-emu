@@ -6,14 +6,23 @@ pub mod backend_web;
 pub mod input;
 pub mod util;
 
+#[cfg(feature = "sdl")]
+pub use backend_sdl::VGAHandle;
+
+#[cfg(feature = "web")]
+pub use backend_web::VGAHandle;
+
 use input::InputMonitoring;
 use std::sync::atomic::{AtomicU16, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
+use util::{get_height_regs, get_width_regs};
 
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
 pub const VERTICAL_RESET_MICRO: u64 = 635;
 
+#[cfg(feature = "sdl")]
 const DEBUG_HEIGHT: usize = 20;
+
 pub const FRAME_RATE_SAMPLES: usize = 100;
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
@@ -37,83 +46,23 @@ impl Default for Options {
     }
 }
 
-pub struct VGA {
-    video_mode: AtomicU8,
+pub struct VGARegs {
     sc_reg: Vec<AtomicU8>,
     gc_reg: Vec<AtomicU8>,
     crt_reg: Vec<AtomicU8>,
     latch_reg: Vec<AtomicU8>,
     general_reg: Vec<AtomicU8>,
     attribute_reg: Vec<AtomicU8>,
-
     color_reg: Vec<AtomicU8>,
+
     color_write_reads: AtomicU16,
+    video_mode: AtomicU8,
+}
+
+pub struct VGA {
+    regs: VGARegs,
     palette_256: RwLock<[u32; 256]>,
-
     pub mem: Vec<Vec<AtomicU8>>,
-}
-
-pub fn new(video_mode: u8) -> VGA {
-    let mem = vec![
-        init_atomic_u8_vec(PLANE_SIZE),
-        init_atomic_u8_vec(PLANE_SIZE),
-        init_atomic_u8_vec(PLANE_SIZE),
-        init_atomic_u8_vec(PLANE_SIZE),
-    ];
-
-    let vga = VGA {
-        video_mode: AtomicU8::new(video_mode),
-        sc_reg: init_atomic_u8_vec(5),
-        gc_reg: init_atomic_u8_vec(9),
-        crt_reg: init_atomic_u8_vec(25),
-        latch_reg: init_atomic_u8_vec(4),
-        general_reg: init_atomic_u8_vec(4),
-        attribute_reg: init_atomic_u8_vec(21),
-
-        color_write_reads: AtomicU16::new(0),
-        color_reg: init_atomic_u8_vec(4),
-        palette_256: RwLock::new(init_default_256_palette()),
-
-        mem,
-    };
-
-    setup_defaults(&vga);
-
-    match video_mode {
-        0x10 => setup_mode_10(&vga),
-        0x13 => setup_mode_13(&vga),
-        _ => panic!("video mode {:x}h not yet implemented", vga.get_video_mode()),
-    }
-
-    vga
-}
-
-fn setup_defaults(vga: &VGA) {
-    vga.set_crt_data(CRTReg::Offset, 40);
-
-    vga.set_gc_data(GCReg::BitMask, 0xFF);
-}
-
-fn setup_mode_10(vga: &VGA) {
-    vga.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even
-    vga.set_crt_data(CRTReg::MaximumScanLine, 0x00);
-    set_horizontal_display_end(vga, 640);
-    set_vertical_display_end(vga, 350);
-}
-
-fn setup_mode_13(vga: &VGA) {
-    vga.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
-    vga.set_crt_data(CRTReg::MaximumScanLine, 0x01);
-    set_horizontal_display_end(vga, 640);
-    set_vertical_display_end(vga, 400);
-}
-
-fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
-    let mut vec = Vec::with_capacity(len);
-    for _ in 0..len {
-        vec.push(AtomicU8::new(0));
-    }
-    vec
 }
 
 //Sequence Controller Register
@@ -206,29 +155,14 @@ pub enum ColorReg {
     State = 0x03,
 }
 
-impl VGA {
-    pub fn start(self: Arc<Self>, options: Options) -> Result<(), String> {
-        #[cfg(feature = "sdl")]
-        return backend_sdl::start_sdl(self, options);
-        #[cfg(feature = "web")]
-        return backend_web::start_web(self, options);
-    }
+fn setup_backend(width: usize, height: usize, show_frame_rate: bool) -> Result<VGAHandle, String> {
+    #[cfg(feature = "sdl")]
+    return backend_sdl::setup_sdl(width, height, show_frame_rate);
+    #[cfg(feature = "web")]
+    return backend_web::setup_web(width, height, show_frame_rate);
+}
 
-    /// Shows the full content of the VGA buffer as one big screen (for debugging) for
-    /// the planar modes. width and height depends on your virtual screen size (640x819 if
-    /// you did not change the default settings)
-    pub fn start_debug_planar_mode(
-        self: Arc<Self>, w: usize, h: usize, options: Options,
-    ) -> Result<(), String> {
-        let mut debug_options = options;
-        debug_options.start_addr_override = Some(0);
-
-        set_horizontal_display_end(&self, w as u32);
-        set_vertical_display_end(&self, h as u32);
-
-        self.start(debug_options)
-    }
-
+impl VGARegs {
     pub fn set_sc_data(&self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
     }
@@ -272,11 +206,110 @@ impl VGA {
     pub fn get_video_mode(&self) -> u8 {
         self.video_mode.load(Ordering::Acquire)
     }
+}
+
+impl VGA {
+    pub fn setup(video_mode: u8, show_frame_rate: bool) -> Result<(VGA, VGAHandle), String> {
+        let mem = vec![
+            init_atomic_u8_vec(PLANE_SIZE),
+            init_atomic_u8_vec(PLANE_SIZE),
+            init_atomic_u8_vec(PLANE_SIZE),
+            init_atomic_u8_vec(PLANE_SIZE),
+        ];
+
+        let regs = VGARegs {
+            sc_reg: init_atomic_u8_vec(5),
+            gc_reg: init_atomic_u8_vec(9),
+            crt_reg: init_atomic_u8_vec(25),
+            latch_reg: init_atomic_u8_vec(4),
+            general_reg: init_atomic_u8_vec(4),
+            attribute_reg: init_atomic_u8_vec(21),
+
+            video_mode: AtomicU8::new(video_mode),
+            color_write_reads: AtomicU16::new(0),
+            color_reg: init_atomic_u8_vec(4),
+        };
+
+        setup_defaults(&regs);
+
+        match video_mode {
+            0x10 => setup_mode_10(&regs),
+            0x13 => setup_mode_13(&regs),
+            _ => panic!(
+                "video mode {:x}h not yet implemented",
+                regs.get_video_mode()
+            ),
+        }
+
+        let width = get_width_regs(&regs);
+        let height = get_height_regs(&regs);
+
+        let backend_handle = setup_backend(width as usize, height as usize, show_frame_rate)?;
+        Ok((
+            VGA {
+                regs,
+                palette_256: RwLock::new(init_default_256_palette()),
+                mem,
+            },
+            backend_handle,
+        ))
+    }
+
+    pub fn start(self: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
+        #[cfg(feature = "sdl")]
+        return backend_sdl::start_sdl(self, handle, options);
+        #[cfg(feature = "web")]
+        return backend_web::start_web(self, handle, options);
+    }
+
+    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
+        self.regs.set_sc_data(reg, v);
+    }
+
+    pub fn get_sc_data(&self, reg: SCReg) -> u8 {
+        self.regs.get_sc_data(reg)
+    }
+
+    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
+        self.regs.set_gc_data(reg, v);
+    }
+
+    pub fn get_gc_data(&self, reg: GCReg) -> u8 {
+        self.regs.get_gc_data(reg)
+    }
+
+    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
+        self.regs.set_crt_data(reg, v);
+    }
+
+    pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
+        self.regs.get_crt_data(reg)
+    }
+
+    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
+        self.regs.set_general_reg(reg, v);
+    }
+
+    pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
+        self.regs.get_general_reg(reg)
+    }
+
+    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
+        self.regs.set_attribute_reg(reg, v);
+    }
+
+    pub fn get_attribute_reg(&self, reg: AttributeReg) -> u8 {
+        self.regs.get_attribute_reg(reg)
+    }
+
+    pub fn get_video_mode(&self) -> u8 {
+        self.regs.get_video_mode()
+    }
 
     pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
-        self.color_reg[reg as usize].swap(v, Ordering::AcqRel);
+        self.regs.color_reg[reg as usize].swap(v, Ordering::AcqRel);
         if reg == ColorReg::Data {
-            let writes = self.color_write_reads.fetch_add(1, Ordering::AcqRel);
+            let writes = self.regs.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressWriteMode) as usize;
             let color_part_shift = (2 - writes) * 8;
 
@@ -285,27 +318,29 @@ impl VGA {
             table[ix] |= ((v & 0x3F) as u32) << color_part_shift;
 
             if writes == 2 {
-                self.color_reg[ColorReg::AddressWriteMode as usize].fetch_add(1, Ordering::AcqRel);
-                self.color_write_reads.store(0, Ordering::Relaxed);
+                self.regs.color_reg[ColorReg::AddressWriteMode as usize]
+                    .fetch_add(1, Ordering::AcqRel);
+                self.regs.color_write_reads.store(0, Ordering::Relaxed);
             }
         }
     }
 
     pub fn get_color_reg(&self, reg: ColorReg) -> u8 {
         if reg == ColorReg::Data {
-            let reads = self.color_write_reads.fetch_add(1, Ordering::AcqRel);
+            let reads = self.regs.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressReadMode) as usize;
             let color_part_shift = (2 - reads) * 8;
             let color = self.get_color_palette_256(ix);
             let word = color & (0xFF as u32) << color_part_shift;
 
             if reads == 2 {
-                self.color_reg[ColorReg::AddressReadMode as usize].fetch_add(1, Ordering::AcqRel);
-                self.color_write_reads.store(0, Ordering::Relaxed);
+                self.regs.color_reg[ColorReg::AddressReadMode as usize]
+                    .fetch_add(1, Ordering::AcqRel);
+                self.regs.color_write_reads.store(0, Ordering::Relaxed);
             }
             (word >> color_part_shift) as u8
         } else {
-            self.color_reg[reg as usize].load(Ordering::Acquire)
+            self.regs.color_reg[reg as usize].load(Ordering::Acquire)
         }
     }
 
@@ -317,7 +352,7 @@ impl VGA {
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
     pub fn write_mem(&self, offset: usize, v_in: u8) {
-        let mem_mode = self.get_sc_data(SCReg::MemoryMode);
+        let mem_mode = self.regs.get_sc_data(SCReg::MemoryMode);
         let dest = if mem_mode & 0x08 != 0 {
             //if chain4 is enabled write to all planes
             0x0F
@@ -329,19 +364,19 @@ impl VGA {
                 0x0A
             }
         } else {
-            self.get_sc_data(SCReg::MapMask)
+            self.regs.get_sc_data(SCReg::MapMask)
         };
 
-        let mut gc_mode = self.get_gc_data(GCReg::GraphicsMode);
-        let bit_mask = self.get_gc_data(GCReg::BitMask);
+        let mut gc_mode = self.regs.get_gc_data(GCReg::GraphicsMode);
+        let bit_mask = self.regs.get_gc_data(GCReg::BitMask);
         gc_mode &= 0x03;
 
         for i in 0..4 {
             if (dest & (1 << i)) != 0 {
                 let v = if gc_mode == 0x01 {
-                    self.latch_reg[i].load(Ordering::Acquire)
+                    self.regs.latch_reg[i].load(Ordering::Acquire)
                 } else {
-                    let v_latch = self.latch_reg[i].load(Ordering::Acquire);
+                    let v_latch = self.regs.latch_reg[i].load(Ordering::Acquire);
                     v_in & bit_mask | (v_latch & !bit_mask)
                 };
                 self.mem[i][offset].swap(v, Ordering::Relaxed);
@@ -357,20 +392,20 @@ impl VGA {
     }
 
     pub fn read_mem(&self, offset: usize) -> u8 {
-        let mem_mode = self.get_sc_data(SCReg::MemoryMode);
+        let mem_mode = self.regs.get_sc_data(SCReg::MemoryMode);
         let select = if mem_mode & 0x08 != 0 {
             //if chain4 is enabled, read from the plan determined by the offsets lower 2 bits
             (offset & 0x03) as usize
         } else {
-            (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
+            (self.regs.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
         };
         for i in 0..4 {
-            self.latch_reg[i].swap(
+            self.regs.latch_reg[i].swap(
                 self.mem[i][offset].load(Ordering::Acquire),
                 Ordering::AcqRel,
             );
         }
-        self.latch_reg[select].load(Ordering::Acquire)
+        self.regs.latch_reg[select].load(Ordering::Acquire)
     }
 
     //useful for testing, inspect the memory for a given plane
@@ -382,6 +417,33 @@ impl VGA {
     pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
         self.mem[plane][offset].swap(v, Ordering::AcqRel);
     }
+}
+
+fn setup_defaults(regs: &VGARegs) {
+    regs.set_crt_data(CRTReg::Offset, 40);
+    regs.set_gc_data(GCReg::BitMask, 0xFF);
+}
+
+fn setup_mode_10(regs: &VGARegs) {
+    regs.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even
+    regs.set_crt_data(CRTReg::MaximumScanLine, 0x00);
+    set_regs_horizontal_display_end(regs, 640);
+    set_regs_vertical_display_end(regs, 350);
+}
+
+fn setup_mode_13(regs: &VGARegs) {
+    regs.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
+    regs.set_crt_data(CRTReg::MaximumScanLine, 0x01);
+    set_regs_horizontal_display_end(regs, 640);
+    set_regs_vertical_display_end(regs, 400);
+}
+
+fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
+    let mut vec = Vec::with_capacity(len);
+    for _ in 0..len {
+        vec.push(AtomicU8::new(0));
+    }
+    vec
 }
 
 fn init_default_256_palette() -> [u32; 256] {
@@ -421,15 +483,24 @@ fn init_default_256_palette() -> [u32; 256] {
 
 //convenience functions
 
-pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
-    vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
+fn set_regs_horizontal_display_end(regs: &VGARegs, width: u32) {
+    regs.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
-pub fn set_vertical_display_end(vga: &VGA, height: u32) {
+pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
+    vga.regs
+        .set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
+}
+
+fn set_regs_vertical_display_end(regs: &VGARegs, height: u32) {
     let h = height - 1;
-    vga.set_crt_data(CRTReg::VerticalDisplayEnd, h as u8);
+    regs.set_crt_data(CRTReg::VerticalDisplayEnd, h as u8);
     let bit_8 = ((h & 0x100) >> 8) as u8;
     let bit_9 = ((h & 0x200) >> 9) as u8;
     let overflow = bit_9 << 6 | bit_8 << 1;
-    vga.set_crt_data(CRTReg::Overflow, overflow);
+    regs.set_crt_data(CRTReg::Overflow, overflow);
+}
+
+pub fn set_vertical_display_end(vga: &VGA, height: u32) {
+    set_regs_vertical_display_end(&vga.regs, height);
 }

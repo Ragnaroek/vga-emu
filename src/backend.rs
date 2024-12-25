@@ -1,6 +1,26 @@
 /// Contains common functionality shared across all backend implementations
 use crate::{AttributeReg, CRTReg, Options, VGA};
 
+// A stripped down input version for the backend controls
+pub struct EmuInput {
+    pub alt: bool,
+    pub f: bool,
+}
+
+impl EmuInput {
+    pub fn new() -> EmuInput {
+        EmuInput {
+            alt: false,
+            f: false,
+        }
+    }
+
+    pub fn clear_keys(&mut self) {
+        self.alt = false;
+        self.f = false;
+    }
+}
+
 #[derive(Debug)]
 pub struct RGB {
     r: u8,
@@ -24,12 +44,15 @@ pub fn render_planar<T: PixelBuffer + ?Sized>(
     let mut x: usize = 0;
     let mut y: usize = 0;
     let mut mem_offset = mem_offset_p;
-    let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
-    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 2; //+1 for exclusive intervall, +1 for "overshot" with potential hpan
+    let max_scan = (vga.regs.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
+    let w_bytes = vga.regs.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 2; //+1 for exclusive intervall, +1 for "overshot" with potential hpan
 
     for _ in 0..(h / max_scan) {
         for _ in 0..max_scan {
-            let hpan = vga.get_attribute_reg(AttributeReg::HorizontalPixelPanning) & 0xF;
+            let hpan = vga
+                .regs
+                .get_attribute_reg(AttributeReg::HorizontalPixelPanning)
+                & 0xF;
             for mem_byte in 0..w_bytes {
                 let v0 = vga.raw_read_mem(0, mem_offset + mem_byte);
                 let v1 = vga.raw_read_mem(1, mem_offset + mem_byte);
@@ -63,8 +86,8 @@ pub fn render_linear<T: PixelBuffer + ?Sized>(
     vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize, buffer: &mut T,
 ) {
     let mut mem_offset = mem_offset_p;
-    let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
-    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 1;
+    let max_scan = (vga.regs.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
+    let w_bytes = vga.regs.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 1;
 
     let mut buffer_offset = 0;
     for _ in 0..((h / max_scan) as usize) {
@@ -131,8 +154,8 @@ pub fn mem_offset(vga: &VGA, options: &Options) -> usize {
     if let Some(over) = options.start_addr_override {
         return over;
     }
-    let low = vga.get_crt_data(CRTReg::StartAdressLow) as u16;
-    let mut addr = vga.get_crt_data(CRTReg::StartAdressHigh) as u16;
+    let low = vga.regs.get_crt_data(CRTReg::StartAdressLow) as u16;
+    let mut addr = vga.regs.get_crt_data(CRTReg::StartAdressHigh) as u16;
     addr <<= 8;
     addr |= low;
     addr as usize

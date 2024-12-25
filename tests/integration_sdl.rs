@@ -2,12 +2,26 @@ extern crate vga;
 
 use vga::util::{get_height, get_width};
 use vga::{
-    set_horizontal_display_end, set_vertical_display_end, ColorReg, GCReg, SCReg, PLANE_SIZE,
+    set_horizontal_display_end, set_vertical_display_end, ColorReg, GCReg, SCReg, PLANE_SIZE, VGA,
 };
 
-#[test]
-fn test_write_read_mem_mode_0() {
-    let vga = vga::new(0x10);
+// SDL Tests have to run from the main thread. Don't use
+// the Rust test harness (which uses multiple threads) and run
+// them in a main.
+fn main() -> Result<(), String> {
+    test_write_read_mem_mode_0()?;
+    test_write_read_mem_mode_1()?;
+    test_write_read_chain_4()?;
+    test_write_read_odd_even()?;
+    test_bit_mask()?;
+    test_set_and_get_horizontal_display_end()?;
+    test_set_and_get_vertical_display_end()?;
+    test_set_color()?;
+    Ok(())
+}
+
+fn test_write_read_mem_mode_0() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x10, false)?;
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -27,11 +41,11 @@ fn test_write_read_mem_mode_0() {
         vga.set_gc_data(GCReg::ReadMapSelect, i);
         assert_eq!(vga.read_mem(666), 112);
     }
+    Ok(())
 }
 
-#[test]
-fn test_write_read_mem_mode_1() {
-    let vga = vga::new(0x10);
+fn test_write_read_mem_mode_1() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x10, false)?;
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {
@@ -48,11 +62,11 @@ fn test_write_read_mem_mode_1() {
         vga.set_gc_data(GCReg::ReadMapSelect, i);
         assert_eq!(vga.read_mem(888), 66);
     }
+    Ok(())
 }
 
-#[test]
-fn test_write_read_chain_4() {
-    let vga = vga::new(0x13); //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
+fn test_write_read_chain_4() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x13, false)?; //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
 
     for i in 0..PLANE_SIZE {
         vga.write_mem(i, i as u8);
@@ -73,11 +87,11 @@ fn test_write_read_chain_4() {
         let v = vga.read_mem(i);
         assert_eq!(v, i as u8);
     }
+    Ok(())
 }
 
-#[test]
-fn test_write_read_odd_even() {
-    let vga = vga::new(0x13); //mode 13 has odd/even enabled
+fn test_write_read_odd_even() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x13, false)?; //mode 13 has odd/even enabled
     vga.set_sc_data(
         SCReg::MemoryMode,
         vga.get_sc_data(SCReg::MemoryMode) & !0x08,
@@ -91,11 +105,11 @@ fn test_write_read_odd_even() {
             assert_eq!(vga.raw_read_mem(p, i), expected);
         }
     }
+    Ok(())
 }
 
-#[test]
-fn test_bit_mask() {
-    let vga = vga::new(0x13); //mode 13 has odd/even enabled
+fn test_bit_mask() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x13, false)?; //mode 13 has odd/even enabled
     vga.set_sc_data(SCReg::MapMask, 0xFF);
     vga.write_mem(666, 0xFF);
     for i in 0..4 {
@@ -116,28 +130,28 @@ fn test_bit_mask() {
     for i in 0..4 {
         assert_eq!(vga.raw_read_mem(i, 666), 0b10100000);
     }
+    Ok(())
 }
 
-#[test]
-fn test_set_and_get_horizontal_display_end() {
-    let vga = vga::new(0x10);
+fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x10, false)?;
     set_horizontal_display_end(&vga, 640);
     assert_eq!(get_width(&vga), 640);
+    Ok(())
 }
 
-#[test]
-fn test_set_and_get_vertical_display_end() {
-    let vga = vga::new(0x10);
+fn test_set_and_get_vertical_display_end() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x10, false)?;
     set_vertical_display_end(&vga, 400);
     assert_eq!(get_height(&vga), 400);
 
     set_vertical_display_end(&vga, 1024);
     assert_eq!(get_height(&vga), 1024);
+    Ok(())
 }
 
-#[test]
-fn test_set_color() {
-    let vga = vga::new(0x10);
+fn test_set_color() -> Result<(), String> {
+    let (vga, _) = VGA::setup(0x10, false)?;
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
 
     for i in 0..3 {
@@ -146,10 +160,10 @@ fn test_set_color() {
     }
 
     assert_eq!(vga.get_color_reg(ColorReg::AddressWriteMode), 1);
-    println!("hex = {:x}", vga.get_color_palette_256(0));
     assert_eq!(vga.get_color_palette_256(0), 0x3F3E3D);
 
     //TODO Write colors here
     //check auto-increment
     //check state register set to 0b11
+    Ok(())
 }
