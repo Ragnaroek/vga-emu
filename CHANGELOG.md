@@ -4,6 +4,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.7.1]
+- Revert to pure unit-tests and provide a VGA instance for testing
+
 # [0.7.0]
 - Fullscreen toggle support via ALT+F
 
