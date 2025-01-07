@@ -1,5 +1,8 @@
 // Provides various utils for implementing something with the VGA
 
+#[cfg(feature = "tracing")]
+use tracing::instrument;
+
 use async_std::task::{self, JoinHandle};
 use std::future::Future;
 use std::time::Duration;
@@ -41,6 +44,7 @@ where
 
 // wait routines
 
+#[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub async fn display_enable(vga: &VGA) {
     loop {
         let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
@@ -51,6 +55,7 @@ pub async fn display_enable(vga: &VGA) {
     }
 }
 
+#[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub async fn vsync(vga: &VGA) {
     loop {
         let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
