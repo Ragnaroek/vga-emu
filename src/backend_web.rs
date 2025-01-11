@@ -1,4 +1,3 @@
-use async_std::task;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use web_sys::Document;
@@ -6,6 +5,8 @@ use web_sys::Document;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::Clamped;
 use wasm_bindgen_futures::spawn_local;
+
+use tokio::time::sleep;
 
 use crate::backend::{is_linear, mem_offset, render_linear, render_planar, PixelBuffer};
 use crate::input::{InputMonitoring, NumCode};
@@ -112,7 +113,7 @@ pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             }
 
             set_de(&vga, true);
-            task::sleep(Duration::ZERO).await;
+            sleep(Duration::ZERO).await;
 
             if linear {
                 render_linear(
@@ -144,16 +145,16 @@ pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             handle.render_context.begin_path();
 
             set_de(&vga, false);
-            task::sleep(Duration::ZERO).await;
+            sleep(Duration::ZERO).await;
 
             set_vr(&vga, true);
-            task::sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
+            sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
             set_vr(&vga, false);
-            task::sleep(Duration::ZERO).await;
+            sleep(Duration::ZERO).await;
 
             let v_elapsed = (js_sys::Date::now() - frame_start) as u128 * 1000;
             if v_elapsed < TARGET_FRAME_RATE_MICRO {
-                task::sleep(Duration::from_micros(
+                sleep(Duration::from_micros(
                     (TARGET_FRAME_RATE_MICRO - v_elapsed) as u64,
                 ))
                 .await;
