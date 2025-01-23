@@ -4,6 +4,7 @@ use std::time::Duration;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
+use tokio::runtime::{self, Runtime};
 use tokio::time::sleep;
 
 use crate::{CRTReg, GeneralReg, VGARegs};
@@ -283,4 +284,14 @@ pub fn copy_system_to_screen_masked_x(
         }
         di += dst_page_width;
     }
+}
+
+pub fn tokio_runtime() -> Result<Runtime, String> {
+    #[cfg(feature = "web")]
+    let rt = runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|e| e.to_string())?;
+    #[cfg(feature = "sdl")]
+    let rt = runtime::Runtime::new().map_err(|e| e.to_string())?;
+    Ok(rt)
 }
