@@ -2,12 +2,13 @@ extern crate vga;
 
 use vga::util::{get_height, get_width};
 use vga::{
-    set_horizontal_display_end, set_vertical_display_end, ColorReg, GCReg, SCReg, PLANE_SIZE, VGA,
+    set_horizontal_display_end, set_vertical_display_end, ColorReg, GCReg, SCReg, VGABuilder,
+    PLANE_SIZE,
 };
 
 #[test]
 fn test_write_read_mem_mode_0() {
-    let vga = VGA::setup_no_backend(0x10);
+    let vga = VGABuilder::new().build_no_backend();
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -31,7 +32,7 @@ fn test_write_read_mem_mode_0() {
 
 #[test]
 fn test_write_read_mem_mode_1() {
-    let vga = VGA::setup_no_backend(0x10);
+    let vga = VGABuilder::new().build_no_backend();
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {
@@ -52,8 +53,7 @@ fn test_write_read_mem_mode_1() {
 
 #[test]
 fn test_write_read_chain_4() {
-    let vga = VGA::setup_no_backend(0x13); //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
-
+    let vga = VGABuilder::new().video_mode(0x13).build_no_backend(); //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
     for i in 0..PLANE_SIZE {
         vga.write_mem(i, i as u8);
         for p in 0..4 {
@@ -77,7 +77,7 @@ fn test_write_read_chain_4() {
 
 #[test]
 fn test_write_read_odd_even() {
-    let vga = VGA::setup_no_backend(0x13); //mode 13 has odd/even enabled
+    let vga = VGABuilder::new().video_mode(0x13).build_no_backend(); //mode 13 has odd/even enabled
     vga.set_sc_data(
         SCReg::MemoryMode,
         vga.get_sc_data(SCReg::MemoryMode) & !0x08,
@@ -95,7 +95,7 @@ fn test_write_read_odd_even() {
 
 #[test]
 fn test_bit_mask() {
-    let vga = VGA::setup_no_backend(0x13); //mode 13 has odd/even enabled
+    let vga = VGABuilder::new().video_mode(0x13).build_no_backend(); //mode 13 has odd/even enabled
     vga.set_sc_data(SCReg::MapMask, 0xFF);
     vga.write_mem(666, 0xFF);
     for i in 0..4 {
@@ -120,14 +120,14 @@ fn test_bit_mask() {
 
 #[test]
 fn test_set_and_get_horizontal_display_end() {
-    let vga = VGA::setup_no_backend(0x10);
+    let vga = VGABuilder::new().build_no_backend();
     set_horizontal_display_end(&vga, 640);
     assert_eq!(get_width(&vga), 640);
 }
 
 #[test]
 fn test_set_and_get_vertical_display_end() {
-    let vga = VGA::setup_no_backend(0x10);
+    let vga = VGABuilder::new().build_no_backend();
     set_vertical_display_end(&vga, 400);
     assert_eq!(get_height(&vga), 400);
 
@@ -137,7 +137,7 @@ fn test_set_and_get_vertical_display_end() {
 
 #[test]
 fn test_set_color() {
-    let vga = VGA::setup_no_backend(0x10);
+    let vga = VGABuilder::new().build_no_backend();
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
 
     for i in 0..3 {

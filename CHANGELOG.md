@@ -4,6 +4,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.7.4]
+- Fullscreen support on startup
+- VGABuilder for improved parameter management
+
 # [0.7.2]
 - Tracing support
 - Optimized memory handling

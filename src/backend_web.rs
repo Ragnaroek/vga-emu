@@ -11,10 +11,7 @@ use tokio::time::sleep;
 use crate::backend::{is_linear, mem_offset, render_linear, render_planar, PixelBuffer};
 use crate::input::{InputMonitoring, NumCode};
 use crate::util::{get_height, get_width, set_de, set_vr};
-use crate::CRTReg;
-use crate::TARGET_FRAME_RATE_MICRO;
-use crate::VERTICAL_RESET_MICRO;
-use crate::{Options, VGA};
+use crate::{CRTReg, Options, VGABuilder, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO, VGA};
 
 pub struct VGAHandle {
     document: Document,
@@ -25,7 +22,7 @@ struct WebBuffer {
     data: Vec<u8>,
 }
 
-pub fn setup_web(width: usize, height: usize, _: bool) -> Result<VGAHandle, String> {
+pub fn setup_web(width: usize, height: usize, _: &VGABuilder) -> Result<VGAHandle, String> {
     let document = web_sys::window().unwrap().document().unwrap();
 
     let canvas = document

@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use vga::util;
-use vga::{set_vertical_display_end, SCReg, VGA};
+use vga::{set_vertical_display_end, SCReg};
+use vga::{util, VGABuilder};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 240;
@@ -28,7 +28,10 @@ static SMOKE_MASK: [u8; 49] = [
 ];
 
 pub fn main() -> Result<(), String> {
-    let (vga, handle) = VGA::setup(0x13, false)?;
+    let (vga, handle) = VGABuilder::new()
+        .video_mode(0x13)
+        .fullscreen(false)
+        .build()?;
 
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);

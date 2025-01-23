@@ -158,11 +158,11 @@ pub enum ColorReg {
     State = 0x03,
 }
 
-fn setup_backend(width: usize, height: usize, show_frame_rate: bool) -> Result<VGAHandle, String> {
+fn setup_backend(width: usize, height: usize, builder: &VGABuilder) -> Result<VGAHandle, String> {
     #[cfg(feature = "sdl")]
-    return backend_sdl::setup_sdl(width, height, show_frame_rate);
+    return backend_sdl::setup_sdl(width, height, builder);
     #[cfg(feature = "web")]
-    return backend_web::setup_web(width, height, show_frame_rate);
+    return backend_web::setup_web(width, height, builder);
 }
 
 impl VGARegs {
@@ -211,10 +211,49 @@ impl VGARegs {
     }
 }
 
-impl VGA {
+pub struct VGABuilder {
+    video_mode: u8,
+    show_frame_rate: bool,
+    fullscreen: bool,
+}
+
+impl VGABuilder {
+    pub fn new() -> VGABuilder {
+        VGABuilder {
+            video_mode: 0x10,
+            show_frame_rate: false,
+            fullscreen: true,
+        }
+    }
+
+    pub fn video_mode(&mut self, mode: u8) -> &mut VGABuilder {
+        self.video_mode = mode;
+        self
+    }
+
+    pub fn show_frame_rate(&mut self, show: bool) -> &mut VGABuilder {
+        self.show_frame_rate = show;
+        self
+    }
+
+    pub fn fullscreen(&mut self, fullscreen: bool) -> &mut VGABuilder {
+        self.fullscreen = fullscreen;
+        self
+    }
+
+    pub fn build(&self) -> Result<(VGA, VGAHandle), String> {
+        VGA::setup(self)
+    }
+
     /// Returns a VGA that is not attached to any backend.
     /// Can be used for unit-testing.
-    pub fn setup_no_backend(video_mode: u8) -> VGA {
+    pub fn build_no_backend(&self) -> VGA {
+        VGA::setup_vga(self)
+    }
+}
+
+impl VGA {
+    pub fn setup_vga(builder: &VGABuilder) -> VGA {
         let mem = vec![
             vec![0; PLANE_SIZE],
             vec![0; PLANE_SIZE],
@@ -230,14 +269,14 @@ impl VGA {
             general_reg: init_atomic_u8_vec(4),
             attribute_reg: init_atomic_u8_vec(21),
 
-            video_mode: AtomicU8::new(video_mode),
+            video_mode: AtomicU8::new(builder.video_mode),
             color_write_reads: AtomicU16::new(0),
             color_reg: init_atomic_u8_vec(4),
         };
 
         setup_defaults(&regs);
 
-        match video_mode {
+        match builder.video_mode {
             0x10 => setup_mode_10(&regs),
             0x13 => setup_mode_13(&regs),
             _ => panic!(
@@ -253,13 +292,13 @@ impl VGA {
         }
     }
 
-    pub fn setup(video_mode: u8, show_frame_rate: bool) -> Result<(VGA, VGAHandle), String> {
-        let vga = VGA::setup_no_backend(video_mode);
+    fn setup(builder: &VGABuilder) -> Result<(VGA, VGAHandle), String> {
+        let vga = VGA::setup_vga(builder);
 
         let width = get_width_regs(&vga.regs);
         let height = get_height_regs(&vga.regs);
 
-        let backend_handle = setup_backend(width as usize, height as usize, show_frame_rate)?;
+        let backend_handle = setup_backend(width as usize, height as usize, builder)?;
         Ok((vga, backend_handle))
     }
 
