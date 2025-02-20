@@ -4,6 +4,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.7.6]
+- space input support
+
+# [0.7.5]
+- tokio runtime helper
+
 # [0.7.4]
 - Fullscreen support on startup
 - VGABuilder for improved parameter management
