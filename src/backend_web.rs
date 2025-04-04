@@ -2,16 +2,16 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use web_sys::Document;
 
-use wasm_bindgen::prelude::*;
 use wasm_bindgen::Clamped;
+use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
 use tokio::time::sleep;
 
-use crate::backend::{is_linear, mem_offset, render_linear, render_planar, PixelBuffer};
+use crate::backend::{PixelBuffer, is_linear, mem_offset, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
 use crate::util::{get_height, get_width, set_de, set_vr};
-use crate::{CRTReg, Options, VGABuilder, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO, VGA};
+use crate::{CRTReg, Options, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO, VGA, VGABuilder};
 
 pub struct VGAHandle {
     document: Document,

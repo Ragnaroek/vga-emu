@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use vga::{set_vertical_display_end, SCReg};
-use vga::{util, VGABuilder};
+use vga::{SCReg, set_vertical_display_end};
+use vga::{VGABuilder, util};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 240;

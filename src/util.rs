@@ -8,7 +8,7 @@ use tokio::runtime::{self, Runtime};
 use tokio::time::sleep;
 
 use crate::{CRTReg, GeneralReg, VGARegs};
-use crate::{GCReg, SCReg, PLANE_SIZE, VGA};
+use crate::{GCReg, PLANE_SIZE, SCReg, VGA};
 
 const SCREEN_WIDTH: usize = 80;
 const PATTERN_BUFFER: usize = 0xfffc;

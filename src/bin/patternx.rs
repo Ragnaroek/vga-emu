@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use vga::{set_vertical_display_end, SCReg};
-use vga::{util, VGABuilder};
+use vga::{SCReg, set_vertical_display_end};
+use vga::{VGABuilder, util};
 
 static PATT_TABLE: [[u8; 16]; 16] = [
     [10, 0, 10, 0, 0, 10, 0, 10, 10, 0, 10, 0, 0, 10, 0, 10],
