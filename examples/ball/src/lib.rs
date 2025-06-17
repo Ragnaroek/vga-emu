@@ -226,8 +226,6 @@ pub fn start_ball() -> Result<(), String> {
 
             adjust_panning(&mut state.panning_state);
 
-            //web_sys::console::log_1(&format!("wait for display_enable").into());
-
             rt_task.block_on(async {
                 display_enable(&vga_t).await;
             });
@@ -257,12 +255,8 @@ pub fn start_ball() -> Result<(), String> {
         }
     });
 
-    let options: vga::Options = vga::Options {
-        show_frame_rate: true,
-        ..Default::default()
-    };
     let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, options)
+    vga_m.start(handle_ref, Default::default())
 }
 
 fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {

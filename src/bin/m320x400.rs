@@ -92,12 +92,8 @@ pub fn main() -> Result<(), String> {
         }
     });
 
-    let options: vga::Options = vga::Options {
-        show_frame_rate: true,
-        ..Default::default()
-    };
     let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, options)?;
+    vga_m.start(handle_ref, Default::default())?;
     Ok(())
 }
 
