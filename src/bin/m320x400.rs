@@ -1,9 +1,6 @@
 //Example from https://www.phatcode.net/res/224/files/html/ch31/31-03.html (LISTING 31.3)
-
-use std::sync::Arc;
-use std::thread;
-
-use vga::{CRTReg, GCReg, SCReg, VGABuilder};
+use std::{thread::sleep, time::Duration};
+use vga::{CRTReg, GCReg, SCReg, VGABuilder, input::NumCode};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -30,7 +27,7 @@ fn new_line(
 }
 
 pub fn main() -> Result<(), String> {
-    let (vga, handle) = VGABuilder::new()
+    let mut vga = VGABuilder::new()
         .video_mode(0x13)
         .fullscreen(false)
         .build()?;
@@ -60,9 +57,6 @@ pub fn main() -> Result<(), String> {
     let crt_mode = vga.get_crt_data(CRTReg::CRTCModeControl);
     vga.set_crt_data(CRTReg::CRTCModeControl, crt_mode & 0x40); //turn on byte mode bit
 
-    let vga_m = Arc::new(vga);
-    let vga_t = vga_m.clone();
-
     let line_list = vec![
         new_line(130, 110, 1, 0, 60, 0),
         new_line(190, 110, 1, 1, 60, 1),
@@ -74,27 +68,32 @@ pub fn main() -> Result<(), String> {
         new_line(70, 170, 1, -1, 60, 7),
     ];
 
-    thread::spawn(move || {
+    loop {
         for b in 0..8 {
             for line in &line_list {
                 let mut x = line.start_x;
                 let mut y = line.start_y;
                 for _ in 0..line.base_len {
-                    write_pixel(&vga_t, x, y, b + line.color);
+                    write_pixel(&vga, x, y, b + line.color);
                     x += line.x_inc;
                     y += line.y_inc;
                 }
             }
 
-            let _ = std::io::stdin()
-                .read_line(&mut String::new())
-                .expect("input read failed");
-        }
-    });
+            loop {
+                if vga.input_monitoring().key_pressed(NumCode::Return) {
+                    vga.input_monitoring().clear_keyboard();
+                    break;
+                }
 
-    let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, Default::default())?;
-    Ok(())
+                if vga.draw_frame() {
+                    return Ok(()); // quit
+                }
+
+                sleep(Duration::from_millis(14)); // target 70 fps
+            }
+        }
+    }
 }
 
 fn write_pixel(vga: &vga::VGA, x: i16, y: i16, color: u8) {

@@ -6,7 +6,7 @@ use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen_futures::spawn_local;
 
-use tokio::time::sleep;
+use tokio::time::{Instant, sleep, sleep_until};
 
 use crate::backend::{PixelBuffer, is_linear, mem_offset, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
@@ -110,7 +110,6 @@ pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             }
 
             set_de(&vga, true);
-            sleep(Duration::ZERO).await;
 
             if linear {
                 render_linear(
@@ -142,19 +141,19 @@ pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             handle.render_context.begin_path();
 
             set_de(&vga, false);
-            sleep(Duration::ZERO).await;
+            //sleep(Duration::ZERO).await;
 
             set_vr(&vga, true);
-            sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
+            //sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
             set_vr(&vga, false);
-            sleep(Duration::ZERO).await;
+            //sleep(Duration::ZERO).await;
 
             let v_elapsed = (js_sys::Date::now() - frame_start) as u128 * 1000;
             if v_elapsed < TARGET_FRAME_RATE_MICRO {
-                sleep(Duration::from_micros(
+                /*sleep(Duration::from_micros(
                     (TARGET_FRAME_RATE_MICRO - v_elapsed) as u64,
                 ))
-                .await;
+                .await;*/
             } else {
                 web_sys::console::log_1(&format!("frame miss!: {}", v_elapsed).into());
             }

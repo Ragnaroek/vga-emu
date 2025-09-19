@@ -1,14 +1,10 @@
 // Provides various utils for implementing something with the VGA
-use std::time::Duration;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use tokio::runtime::{self, Runtime};
-use tokio::time::sleep;
-
 use crate::{CRTReg, GeneralReg, VGARegs};
-use crate::{GCReg, PLANE_SIZE, SCReg, VGA};
+use crate::{GCReg, PLANE_SIZE, SCReg, VGA, VGAEmu};
 
 const SCREEN_WIDTH: usize = 80;
 const PATTERN_BUFFER: usize = 0xfffc;
@@ -16,37 +12,8 @@ const PATTERN_BUFFER: usize = 0xfffc;
 const LEFT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x0e, 0x0c, 0x08];
 const RIGHT_CLIP_PLANE_MASK: [u8; 4] = [0x0f, 0x01, 0x03, 0x07];
 
-const VSYNC_MASK: u8 = 0x08;
-const DE_MASK: u8 = 0x01;
-
-const POLL_WAIT_MICROS: u64 = 500;
-
 const CLEAR_DE_MASK: u8 = 0b11111110;
 const CLEAR_VR_MASK: u8 = 0b11110111;
-
-// wait routines
-
-#[cfg_attr(feature = "tracing", instrument(skip_all))]
-pub async fn display_enable(vga: &VGA) {
-    loop {
-        let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
-        if in1 & DE_MASK == 0 {
-            break;
-        }
-        sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
-    }
-}
-
-#[cfg_attr(feature = "tracing", instrument(skip_all))]
-pub async fn vsync(vga: &VGA) {
-    loop {
-        let in1 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
-        if in1 & VSYNC_MASK != 0 {
-            break;
-        }
-        sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
-    }
-}
 
 /// width in pixel
 
@@ -55,7 +22,7 @@ pub fn get_width_regs(regs: &VGARegs) -> u32 {
 }
 
 pub fn get_width(vga: &VGA) -> u32 {
-    get_width_regs(&vga.regs)
+    get_width_regs(&vga.vga_emu.regs)
 }
 
 pub fn get_height_regs(regs: &VGARegs) -> u32 {
@@ -63,7 +30,7 @@ pub fn get_height_regs(regs: &VGARegs) -> u32 {
 }
 
 pub fn get_height(vga: &VGA) -> u32 {
-    get_height_regs(&vga.regs)
+    get_height_regs(&vga.vga_emu.regs)
 }
 
 /// Constructs the Vertical Display End from the register + offset register
@@ -78,7 +45,7 @@ fn get_vertical_display_end(regs: &VGARegs) -> u32 {
 }
 
 /// display enable NOT
-pub fn set_de(vga: &VGA, display_mode: bool) {
+pub fn set_de(vga: &VGAEmu, display_mode: bool) {
     let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if display_mode {
         //flag needs to be set to zero (NOT)
@@ -92,7 +59,7 @@ pub fn set_de(vga: &VGA, display_mode: bool) {
 }
 
 /// vertical retrace
-pub fn set_vr(vga: &VGA, set: bool) {
+pub fn set_vr(vga: &VGAEmu, set: bool) {
     let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if set {
         vga.regs
@@ -114,19 +81,23 @@ pub fn fill_pattern_x(
     }
 
     for i in 0..4 {
-        vga.regs.set_sc_data(SCReg::MapMask, 1);
-        vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4]);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 1);
+        vga.vga_emu
+            .write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4]);
 
-        vga.regs.set_sc_data(SCReg::MapMask, 2);
-        vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 1]);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 2);
+        vga.vga_emu
+            .write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 1]);
 
-        vga.regs.set_sc_data(SCReg::MapMask, 4);
-        vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 2]);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 4);
+        vga.vga_emu
+            .write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 2]);
 
-        vga.regs.set_sc_data(SCReg::MapMask, 8);
-        vga.write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 3]);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 8);
+        vga.vga_emu
+            .write_mem((PATTERN_BUFFER - 1) + i, pattern[i * 4 + 3]);
     }
-    vga.regs.set_gc_data(GCReg::BitMask, 0);
+    vga.vga_emu.regs.set_gc_data(GCReg::BitMask, 0);
 
     let mut si = (start_y & 0x03) + (PATTERN_BUFFER - 1);
     let mut di = start_y * SCREEN_WIDTH + (start_x >> 2) + page_base;
@@ -142,28 +113,28 @@ pub fn fill_pattern_x(
     }
 
     for _ in 0..height {
-        let _ = vga.read_mem(si); //latch pattern
+        let _ = vga.vga_emu.read_mem(si); //latch pattern
         si += 1;
         if si >= PLANE_SIZE {
             si -= 4;
         }
-        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
-        vga.write_mem(di, 0x00);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, left_clip);
+        vga.vga_emu.write_mem(di, 0x00);
 
         if width > 0 {
-            vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
+            vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 0x0F);
             for w in 0..(width - 1) {
-                vga.write_mem(di + (w + 1), 0x00);
+                vga.vga_emu.write_mem(di + (w + 1), 0x00);
             }
 
-            vga.regs.set_sc_data(SCReg::MapMask, right_clip);
-            vga.write_mem(di + width, 0x00);
+            vga.vga_emu.regs.set_sc_data(SCReg::MapMask, right_clip);
+            vga.vga_emu.write_mem(di + width, 0x00);
         }
 
         di += SCREEN_WIDTH;
     }
 
-    vga.regs.set_gc_data(GCReg::BitMask, 0xFF);
+    vga.vga_emu.regs.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
 pub fn fill_rectangle_x(
@@ -187,17 +158,17 @@ pub fn fill_rectangle_x(
     }
 
     for _ in 0..height {
-        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
-        vga.write_mem(di, color);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, left_clip);
+        vga.vga_emu.write_mem(di, color);
 
         if width > 0 {
-            vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
+            vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 0x0F);
             for w in 0..(width - 1) {
-                vga.write_mem(di + (w + 1), color);
+                vga.vga_emu.write_mem(di + (w + 1), color);
             }
 
-            vga.regs.set_sc_data(SCReg::MapMask, right_clip);
-            vga.write_mem(di + width, color);
+            vga.vga_emu.regs.set_sc_data(SCReg::MapMask, right_clip);
+            vga.vga_emu.write_mem(di + width, color);
         }
 
         di += SCREEN_WIDTH;
@@ -209,7 +180,7 @@ pub fn copy_screen_to_screen_x(
     dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize,
 ) {
-    vga.regs.set_gc_data(GCReg::BitMask, 0);
+    vga.vga_emu.regs.set_gc_data(GCReg::BitMask, 0);
 
     let dst_page_width = dst_bitmap_width >> 2;
     let mut di = (dst_page_width * dst_start_y) + (dst_start_x >> 2) + dst_page_base;
@@ -223,27 +194,28 @@ pub fn copy_screen_to_screen_x(
     let width_bytes = src_end_x - src_start_x;
     let src_height = src_end_y - src_start_y;
 
+    println!("w = {}, bytes={}", src_page_width, width_bytes);
     let src_next_offset = src_page_width - width_bytes;
     let dst_next_offset = dst_page_width - width_bytes;
 
     for _ in 0..src_height {
-        vga.regs.set_sc_data(SCReg::MapMask, left_clip);
-        let _ = vga.read_mem(si);
-        vga.write_mem(di, 0x00);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, left_clip);
+        let _ = vga.vga_emu.read_mem(si);
+        vga.vga_emu.write_mem(di, 0x00);
         si += 1;
         di += 1;
 
-        vga.regs.set_sc_data(SCReg::MapMask, 0x0F);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 0x0F);
         for _ in 0..(width_bytes - 1) {
-            let _ = vga.read_mem(si);
-            vga.write_mem(di, 0x00);
+            let _ = vga.vga_emu.read_mem(si);
+            vga.vga_emu.write_mem(di, 0x00);
             si += 1;
             di += 1;
         }
 
-        vga.regs.set_sc_data(SCReg::MapMask, right_clip);
-        let _ = vga.read_mem(si);
-        vga.write_mem(di + width_bytes, 0x00);
+        vga.vga_emu.regs.set_sc_data(SCReg::MapMask, right_clip);
+        let _ = vga.vga_emu.read_mem(si);
+        vga.vga_emu.write_mem(di + width_bytes, 0x00);
         si += 1;
         di += 1;
 
@@ -271,8 +243,8 @@ pub fn copy_system_to_screen_masked_x(
         let mut plane = di & 0b11;
         for _ in 0..width_bytes {
             if mask[si] != 0 {
-                vga.regs.set_sc_data(SCReg::MapMask, 1 << plane);
-                vga.write_mem(ix, source[si]);
+                vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 1 << plane);
+                vga.vga_emu.write_mem(ix, source[si]);
             }
             if plane == 3 {
                 ix += 1;
@@ -284,14 +256,4 @@ pub fn copy_system_to_screen_masked_x(
         }
         di += dst_page_width;
     }
-}
-
-pub fn tokio_runtime() -> Result<Runtime, String> {
-    #[cfg(feature = "web")]
-    let rt = runtime::Builder::new_current_thread()
-        .build()
-        .map_err(|e| e.to_string())?;
-    #[cfg(feature = "sdl")]
-    let rt = runtime::Runtime::new().map_err(|e| e.to_string())?;
-    Ok(rt)
 }

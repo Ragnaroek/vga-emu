@@ -1,9 +1,7 @@
 //Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-49.md (LISTING 49.5)
+use std::{thread::sleep, time::Duration};
 
-use std::sync::Arc;
-
-use vga::{SCReg, set_vertical_display_end};
-use vga::{VGABuilder, util};
+use vga::{SCReg, VGABuilder, set_vertical_display_end, util};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 240;
@@ -28,7 +26,7 @@ static SMOKE_MASK: [u8; 49] = [
 ];
 
 pub fn main() -> Result<(), String> {
-    let (vga, handle) = VGABuilder::new()
+    let mut vga = VGABuilder::new()
         .video_mode(0x13)
         .fullscreen(false)
         .build()?;
@@ -66,10 +64,10 @@ pub fn main() -> Result<(), String> {
         SCREEN_WIDTH,
     );
 
-    let vga_m = Arc::new(vga);
-    let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, Default::default())?;
-    Ok(())
+    loop {
+        vga.draw_frame();
+        sleep(Duration::from_millis(14)); // target 70 fps
+    }
 }
 
 fn draw_background(vga: &vga::VGA, page_start: usize) {

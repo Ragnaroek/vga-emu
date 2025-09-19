@@ -2,7 +2,7 @@
 use tracing::instrument;
 
 /// Contains common functionality shared across all backend implementations
-use crate::{AttributeReg, CRTReg, Options, VGA};
+use crate::{AttributeReg, CRTReg, VGAEmu};
 
 // A stripped down input version for the backend controls
 pub struct EmuInput {
@@ -43,7 +43,7 @@ pub trait PixelBuffer {
 /// pitch = length of one row in bytes
 #[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_planar<T: PixelBuffer + ?Sized>(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T, pitch: usize,
+    vga: &VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T, pitch: usize,
 ) {
     let mut x: usize = 0;
     let mut y: usize = 0;
@@ -88,7 +88,8 @@ pub fn render_planar<T: PixelBuffer + ?Sized>(
 
 #[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_linear<T: PixelBuffer + ?Sized>(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize, buffer: &mut T,
+    vga: &VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize,
+    buffer: &mut T,
 ) {
     let mut mem_offset = mem_offset_p;
     let max_scan = (vga.regs.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
@@ -152,15 +153,4 @@ fn default_16_color(v: u8) -> RGB {
 
 pub fn is_linear(vmode: u8) -> bool {
     vmode == 0x13
-}
-
-pub fn mem_offset(vga: &VGA, options: &Options) -> usize {
-    if let Some(over) = options.start_addr_override {
-        return over;
-    }
-    let low = vga.regs.get_crt_data(CRTReg::StartAdressLow) as u16;
-    let mut addr = vga.regs.get_crt_data(CRTReg::StartAdressHigh) as u16;
-    addr <<= 8;
-    addr |= low;
-    addr as usize
 }
