@@ -17,7 +17,7 @@ pub use backend_sdl3::RenderContext;
 #[cfg(feature = "test")]
 pub use backend_test::RenderContext;
 #[cfg(feature = "web")]
-pub use backend_web::VGAHandle;
+pub use backend_web::RenderContext;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
@@ -298,7 +298,7 @@ impl VGA {
     }
 
     pub fn get_video_mode(&self) -> u8 {
-        self.vga_emu.regs.get_video_mode()
+        self.vga_emu.get_video_mode()
     }
 
     pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
@@ -426,6 +426,10 @@ impl VGAEmu {
 
     pub fn get_palette_256(&self) -> RwLockReadGuard<'_, [u32; 256]> {
         self.palette_256.read().unwrap()
+    }
+
+    pub fn get_video_mode(&self) -> u8 {
+        self.regs.get_video_mode()
     }
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)

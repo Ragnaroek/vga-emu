@@ -1,5 +1,8 @@
 // Provides various utils for implementing something with the VGA
 
+#[cfg(feature = "sdl3")]
+use std::time::Duration;
+
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
@@ -21,16 +24,16 @@ pub fn get_width_regs(regs: &VGARegs) -> u32 {
     (regs.get_crt_data(CRTReg::HorizontalDisplayEnd) as u32 + 1) * 8
 }
 
-pub fn get_width(vga: &VGA) -> u32 {
-    get_width_regs(&vga.vga_emu.regs)
+pub fn get_width(vga: &VGAEmu) -> u32 {
+    get_width_regs(&vga.regs)
 }
 
 pub fn get_height_regs(regs: &VGARegs) -> u32 {
     get_vertical_display_end(regs) + 1
 }
 
-pub fn get_height(vga: &VGA) -> u32 {
-    get_height_regs(&vga.vga_emu.regs)
+pub fn get_height(vga: &VGAEmu) -> u32 {
+    get_height_regs(&vga.regs)
 }
 
 /// Constructs the Vertical Display End from the register + offset register
@@ -256,4 +259,22 @@ pub fn copy_system_to_screen_masked_x(
         }
         di += dst_page_width;
     }
+}
+
+pub async fn sleep(millis: u64) {
+    #[cfg(feature = "web")]
+    sleep_web(millis as i32).await;
+    #[cfg(any(feature = "sdl3", feature = "test"))]
+    tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+}
+
+#[cfg(feature = "web")]
+async fn sleep_web(millis: i32) {
+    let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
+        let win = web_sys::window().expect("web_sys window");
+        win.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, millis)
+            .expect("timeout set");
+    };
+    let p = js_sys::Promise::new(&mut cb);
+    wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
 }

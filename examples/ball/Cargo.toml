@@ -19,15 +19,25 @@ path = "src/main.rs"
 web = [
     "vga-emu/web",
     "dep:wasm-bindgen",
+    "dep:wasm-bindgen-futures",
     "dep:console_error_panic_hook",
     "dep:web-sys",
+    "dep:js-sys",
 ]
-sdl = ["vga-emu/sdl3"]
+sdl = [
+    "vga-emu/sdl3",
+    "dep:tokio",
+]
 
 [dependencies]
 vga-emu = { path = "../../" }
 
+# feature sdl
+tokio = { version = "1.47.1", optional = true, features = ["time", "rt"] }
+
 # feature web
 wasm-bindgen = { version = "0.2.101", optional = true }
+wasm-bindgen-futures = { version = "0.4.53", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
 web-sys = { version = "0.3.78", optional = true, features = ['console'] }
+js-sys = { version = "0.3.77", optional = true}

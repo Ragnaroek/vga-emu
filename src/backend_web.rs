@@ -1,61 +1,54 @@
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use web_sys::Document;
+use std::rc::Rc;
 
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
+use web_sys::{CanvasRenderingContext2d, Document};
 
-use tokio::time::{Instant, sleep, sleep_until};
-
-use crate::backend::{PixelBuffer, is_linear, mem_offset, render_linear, render_planar};
+use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
-use crate::util::{get_height, get_width, set_de, set_vr};
-use crate::{CRTReg, Options, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO, VGA, VGABuilder};
+use crate::util::{get_height, get_width, set_de};
+use crate::{CRTReg, VGABuilder, VGAEmu};
 
-pub struct VGAHandle {
+pub struct RenderContext {
     document: Document,
-    render_context: web_sys::CanvasRenderingContext2d,
+    ctx: CanvasRenderingContext2d,
+    fullscreen: bool,
+    simulate_vertical_reset: bool,
+    input_monitoring: Rc<InputMonitoring>,
 }
 
 struct WebBuffer {
     data: Vec<u8>,
 }
 
-pub fn setup_web(width: usize, height: usize, _: &VGABuilder) -> Result<VGAHandle, String> {
-    let document = web_sys::window().unwrap().document().unwrap();
+impl RenderContext {
+    pub fn init(width: usize, height: usize, builder: VGABuilder) -> Result<RenderContext, String> {
+        let document = web_sys::window().unwrap().document().unwrap();
 
-    let canvas = document
-        .get_element_by_id("vga")
-        .expect("canvas element with id 'vga' not found");
-    let canvas: web_sys::HtmlCanvasElement = canvas
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .map_err(|_| ())
-        .unwrap();
+        let canvas = document
+            .get_element_by_id("vga")
+            .expect("canvas element with id 'vga' not found");
+        let canvas: web_sys::HtmlCanvasElement = canvas
+            .dyn_into::<web_sys::HtmlCanvasElement>()
+            .map_err(|_| ())
+            .unwrap();
 
-    canvas.set_width(width as u32);
-    canvas.set_height(height as u32);
+        canvas.set_width(width as u32);
+        canvas.set_height(height as u32);
 
-    let ctx = canvas
-        .get_context("2d")
-        .unwrap()
-        .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .unwrap();
+        let ctx = canvas
+            .get_context("2d")
+            .unwrap()
+            .unwrap()
+            .dyn_into::<web_sys::CanvasRenderingContext2d>()
+            .unwrap();
 
-    Ok(VGAHandle {
-        document,
-        render_context: ctx,
-    })
-}
+        // setup input monitoring
 
-pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
-    let w = get_width(&vga);
-    let h = get_height(&vga);
+        let input_monitoring = Rc::new(InputMonitoring::new());
 
-    if let Some(ref mon) = options.input_monitoring {
-        let mon_down = mon.clone();
-        let mon_up = mon.clone();
+        let mon_down = input_monitoring.clone();
+        let mon_up = input_monitoring.clone();
         let keydown_handler: Closure<dyn Fn(_)> =
             Closure::wrap(Box::new(move |e: web_sys::Event| {
                 handle_key(false, mon_down.clone(), e)
@@ -64,111 +57,104 @@ pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             Closure::wrap(Box::new(move |e: web_sys::Event| {
                 handle_key(true, mon_up.clone(), e)
             }));
-        handle
-            .document
+        document
             .add_event_listener_with_callback("keydown", keydown_handler.as_ref().unchecked_ref())
             .expect("add keydown event");
-        handle
-            .document
+        document
             .add_event_listener_with_callback("keyup", keyup_handler.as_ref().unchecked_ref())
             .expect("add keyup event");
         keydown_handler.forget();
         keyup_handler.forget();
+
+        Ok(RenderContext {
+            document,
+            ctx,
+            fullscreen: builder.fullscreen,
+            simulate_vertical_reset: builder.simulate_vertical_reset,
+            input_monitoring: input_monitoring,
+        })
     }
 
-    // TODO vmode, linear, w, h, v_stretch, offset_delta => provide init function for this and remove
-    // code duplication in web and sdl impl!
-    let vmode = vga.get_video_mode();
-    let linear = is_linear(vmode);
+    pub fn draw_frame(&self, vga: &VGAEmu) -> bool {
+        let w = get_width(&vga);
+        let h = get_height(&vga);
 
-    //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
-    //but I haven't figured out how yet
-    let v_stretch = if vmode == 0x13 { 2 } else { 1 };
+        // TODO vmode, linear, w, h, v_stretch, offset_delta => provide init function for this and remove
+        // code duplication in web and sdl impl!
+        let vmode = vga.get_video_mode();
+        let linear = is_linear(vmode);
 
-    let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
-    if offset_delta == 0 {
-        return Err(format!("illegal CRT offset: {}", offset_delta));
-    }
+        //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
+        //but I haven't figured out how yet
+        let v_stretch = if vmode == 0x13 { 2 } else { 1 };
 
-    let mut buffer = WebBuffer {
-        data: vec![0; (w * h * 4) as usize],
-    };
+        let offset_delta = vga.regs.get_crt_data(CRTReg::Offset) as usize;
+        if offset_delta == 0 {
+            panic!("illegal CRT offset: {}", offset_delta); // TODO don't panic? it is not nice
+        }
 
-    spawn_local(async move {
-        loop {
-            let mem_offset = mem_offset(&vga, &options);
-            let frame_start = js_sys::Date::now();
+        let mut buffer = WebBuffer {
+            data: vec![0; (w * h * 4) as usize],
+        };
 
-            for x in 0..100 {
-                for y in 0..100 {
-                    let red = ((y * w * 4) + x * 4) as usize;
-                    buffer.data[red] = 128;
-                    buffer.data[red + 1] = 128;
-                    buffer.data[red + 2] = 128;
-                    buffer.data[red + 3] = 255;
-                }
-            }
+        let mem_offset = vga.mem_offset();
 
-            set_de(&vga, true);
-
-            if linear {
-                render_linear(
-                    &vga,
-                    mem_offset,
-                    offset_delta,
-                    h as usize,
-                    v_stretch,
-                    &mut buffer,
-                );
-            } else {
-                render_planar(
-                    &vga,
-                    mem_offset,
-                    offset_delta,
-                    h as usize,
-                    &mut buffer,
-                    w as usize * WebBuffer::PIXEL_WIDTH,
-                );
-            }
-
-            let image_data =
-                web_sys::ImageData::new_with_u8_clamped_array(Clamped(&buffer.data), w)
-                    .expect("image data");
-            handle
-                .render_context
-                .put_image_data(&image_data, 0.0, 0.0)
-                .expect("put image data");
-            handle.render_context.begin_path();
-
-            set_de(&vga, false);
-            //sleep(Duration::ZERO).await;
-
-            set_vr(&vga, true);
-            //sleep(Duration::from_micros(VERTICAL_RESET_MICRO)).await;
-            set_vr(&vga, false);
-            //sleep(Duration::ZERO).await;
-
-            let v_elapsed = (js_sys::Date::now() - frame_start) as u128 * 1000;
-            if v_elapsed < TARGET_FRAME_RATE_MICRO {
-                /*sleep(Duration::from_micros(
-                    (TARGET_FRAME_RATE_MICRO - v_elapsed) as u64,
-                ))
-                .await;*/
-            } else {
-                web_sys::console::log_1(&format!("frame miss!: {}", v_elapsed).into());
+        for x in 0..100 {
+            for y in 0..100 {
+                let red = ((y * w * 4) + x * 4) as usize;
+                buffer.data[red] = 128;
+                buffer.data[red + 1] = 128;
+                buffer.data[red + 2] = 128;
+                buffer.data[red + 3] = 255;
             }
         }
-    });
-    Ok(())
+
+        set_de(&vga, true);
+
+        if linear {
+            render_linear(
+                &vga,
+                mem_offset,
+                offset_delta,
+                h as usize,
+                v_stretch,
+                &mut buffer,
+            );
+        } else {
+            render_planar(
+                &vga,
+                mem_offset,
+                offset_delta,
+                h as usize,
+                &mut buffer,
+                w as usize * WebBuffer::PIXEL_WIDTH,
+            );
+        }
+
+        let image_data = web_sys::ImageData::new_with_u8_clamped_array(Clamped(&buffer.data), w)
+            .expect("image data");
+        self.ctx
+            .put_image_data(&image_data, 0.0, 0.0)
+            .expect("put image data");
+        self.ctx.begin_path();
+
+        false
+    }
+
+    pub fn input_monitoring(&mut self) -> &mut InputMonitoring {
+        Rc::get_mut(&mut self.input_monitoring).unwrap()
+    }
 }
 
-fn handle_key(up: bool, input: Arc<Mutex<InputMonitoring>>, event: web_sys::Event) {
+fn handle_key(up: bool, input: Rc<InputMonitoring>, event: web_sys::Event) {
+    // TODO impl key handling for web
+    /*
     let keyboard_event = event
         .dyn_into::<web_sys::KeyboardEvent>()
         .expect("a KeyboardEvent");
     let key = to_num_code(&keyboard_event.key());
-    let mut mon = input.lock().expect("keyboard lock");
-    mon.keyboard.buttons[key as usize] = !up;
+    input.keyboard.buttons[key as usize] = !up;
+    */
 }
 
 fn to_num_code(key: &str) -> NumCode {

@@ -3,10 +3,8 @@
 #[cfg(feature = "web")]
 pub mod web;
 
-use std::{thread::sleep, time::Duration};
-
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder};
+use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder, util::sleep};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -82,7 +80,7 @@ fn initial_render_state() -> RenderState {
     }
 }
 
-pub fn start_ball() -> Result<(), String> {
+pub async fn start_ball() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .fullscreen(false)
         .simulate_vertical_reset()
@@ -177,6 +175,7 @@ pub fn start_ball() -> Result<(), String> {
 
     let mut state = initial_render_state();
 
+    //let vga = std::sync::Arc::new(vga);
     loop {
         for bx in (0..NUM_BALLS).rev() {
             draw_ball(
@@ -242,7 +241,7 @@ pub fn start_ball() -> Result<(), String> {
         if vga.draw_frame() {
             return Ok(()); // quit
         }
-        sleep(Duration::from_millis(14)); // target 70 fps
+        sleep(14).await; // target 70 fps
     }
 }
 
