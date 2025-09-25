@@ -1,5 +1,4 @@
 use wasm_bindgen::prelude::*;
-use wasm_bindgen_futures::spawn_local;
 
 use super::start_ball;
 
@@ -7,7 +6,7 @@ use super::start_ball;
 pub fn start_ball_web() {
     console_error_panic_hook::set_once();
 
-    spawn_local(async move {
+    vga::util::spawn_async(async move {
         start_ball()
             .await
             .expect("ball demo finished without error");

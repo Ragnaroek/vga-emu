@@ -1,8 +1,5 @@
 // Provides various utils for implementing something with the VGA
 
-#[cfg(feature = "sdl3")]
-use std::time::Duration;
-
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
@@ -261,20 +258,54 @@ pub fn copy_system_to_screen_masked_x(
     }
 }
 
-pub async fn sleep(millis: u64) {
-    #[cfg(feature = "web")]
-    sleep_web(millis as i32).await;
-    #[cfg(any(feature = "sdl3", feature = "test"))]
-    tokio::time::sleep(std::time::Duration::from_millis(millis)).await;
+#[cfg(any(feature = "sdl3", feature = "test"))]
+/// task sleep that works with all the different backends
+pub async fn sleep(millis: u32) {
+    tokio::time::sleep(std::time::Duration::from_millis(millis as u64)).await;
 }
 
 #[cfg(feature = "web")]
-async fn sleep_web(millis: i32) {
+/// task sleep that works with all the different backends
+pub async fn sleep(millis: u32) {
     let mut cb = |resolve: js_sys::Function, _reject: js_sys::Function| {
         let win = web_sys::window().expect("web_sys window");
-        win.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, millis)
+        win.set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, millis as i32)
             .expect("timeout set");
     };
     let p = js_sys::Promise::new(&mut cb);
     wasm_bindgen_futures::JsFuture::from(p).await.unwrap();
+}
+
+#[cfg(feature = "web")]
+/// async task spawner that works with all the different backends.
+/// The task is always spawned in the current thread to avoid
+/// Send issues.
+pub fn spawn_async<F>(future: F)
+where
+    F: Future<Output = ()> + 'static,
+{
+    wasm_bindgen_futures::spawn_local(future);
+}
+
+#[cfg(any(feature = "sdl3", feature = "test"))]
+/// async task spawner that works with all the different backends.
+/// The task is always spawned in the current thread to avoid
+/// Send issues.
+pub fn spawn_async<F>(future: F)
+where
+    F: Future<Output = ()> + 'static,
+{
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .expect("tokio runtime setup");
+
+    rt.block_on(async move {
+        let local = tokio::task::LocalSet::new();
+        local
+            .run_until(async move {
+                tokio::task::spawn_local(future).await.unwrap();
+            })
+            .await;
+    });
 }
