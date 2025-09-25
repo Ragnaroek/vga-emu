@@ -4,9 +4,12 @@
 # vga
 (Cycle) accurate VGA emulator
 
-Coming next:
-https://www.phatcode.net/res/224/files/html/ch24/24-02.html
-
 Supports different render backends. At the moment supported:
-* SDL
+* SDL3
 * Web
+
+# Examples
+
+| Name                 | Description                                                           | Screenshot                                                                                                                                |
+|----------------------|-----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+|[ball](examples/ball)       | [Ball example from Michael Abrash's Graphics Programming Black Book](https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md)                                         |![ball](https://ragnaroek.github.io/vga-emu/examples/ball/example.png)              |
