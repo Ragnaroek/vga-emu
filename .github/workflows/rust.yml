@@ -51,8 +51,13 @@ jobs:
           cmake --build build --config Release --parallel
           cmake --install build
 
-      - name: Set library path
-        run: echo "LIBRARY_PATH=/usr/local/lib" >> $GITHUB_ENV
+      - name: Set SDL3 env vars
+        run: |
+          echo "SDL3_DIR=$GITHUB_WORKSPACE/SDL3/install" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=$GITHUB_WORKSPACE/SDL3/install/lib:$LIBRARY_PATH" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=$GITHUB_WORKSPACE/SDL3/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+          echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/SDL3/install/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
+          echo "C_INCLUDE_PATH=$GITHUB_WORKSPACE/SDL3/install/include:$C_INCLUDE_PATH" >> $GITHUB_ENV
 
       - name: Run tests SDL
         run: cargo test --features sdl --verbose
