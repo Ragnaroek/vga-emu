@@ -68,5 +68,8 @@ jobs:
       - name: Build sdl
         run: just build-sdl
 
+      - name: Build examples
+        run: just build-sdl-examples
+
       - name: Run tests
         run: just test
