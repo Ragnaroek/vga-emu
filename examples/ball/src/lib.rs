@@ -4,7 +4,7 @@
 pub mod web;
 
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder, util::sleep};
+use vga::{util::sleep, AttributeReg, CRTReg, GCReg, SCReg, VGABuilder};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -83,7 +83,7 @@ fn initial_render_state() -> RenderState {
 pub async fn start_ball() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .fullscreen(false)
-        .simulate_vertical_reset()
+        .title("VGA Ball Example".to_string())
         .build()?;
 
     draw_border(&mut vga, PAGE0_OFFSET);

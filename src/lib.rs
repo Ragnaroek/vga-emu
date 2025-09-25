@@ -196,6 +196,7 @@ impl VGARegs {
 pub struct VGABuilder {
     video_mode: u8,
     fullscreen: bool,
+    title: String,
     simulate_vertical_reset: bool,
     start_addr_override: Option<usize>,
 }
@@ -205,9 +206,15 @@ impl VGABuilder {
         VGABuilder {
             video_mode: 0x10,
             fullscreen: true,
+            title: "VGA".to_string(),
             simulate_vertical_reset: false,
             start_addr_override: None,
         }
+    }
+
+    pub fn title(mut self, title: String) -> VGABuilder {
+        self.title = title;
+        self
     }
 
     pub fn video_mode(mut self, mode: u8) -> VGABuilder {

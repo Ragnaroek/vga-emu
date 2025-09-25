@@ -33,8 +33,7 @@ impl RenderContext {
         let vid = sdl.video().map_err(|e| e.to_string())?;
         let event_pump = sdl.event_pump().map_err(|e| e.to_string())?;
 
-        // TODO take window name from VGABuilder
-        let mut window_builder = vid.window("VGA", width as u32, height as u32);
+        let mut window_builder = vid.window(&builder.title, width as u32, height as u32);
         window_builder.position_centered();
         if builder.fullscreen {
             window_builder.fullscreen();
