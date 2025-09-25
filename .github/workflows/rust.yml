@@ -21,6 +21,9 @@ jobs:
           toolchain: stable
           override: true
 
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+
       - name: Update
         run: |
           sudo apt-get update
