@@ -22,10 +22,9 @@ jobs:
           override: true
 
       - name: Install SDL3
-        run: |
-          wget https://github.com/libsdl-org/SDL/releases/latest/download/SDL3-linux-aarch64.tar.gz
-          tar -xf SDL3-linux-aarch64.tar.gz
-          sudo cp -r SDL3-*/* /usr/local/
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgArguments: install sdl3
 
       - name: Run tests SDL
         run: cargo test --features sdl --verbose
