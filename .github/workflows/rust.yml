@@ -23,8 +23,9 @@ jobs:
 
       - name: Install SDL3
         run: |
-          sudo apt-get update
-          sudo apt-get install -y libsdl3-dev
+          wget https://github.com/libsdl-org/SDL/releases/latest/download/SDL3-linux-aarch64.tar.gz
+          tar -xf SDL3-linux-aarch64.tar.gz
+          sudo cp -r SDL3-*/* /usr/local/
 
       - name: Run tests SDL
         run: cargo test --features sdl --verbose
