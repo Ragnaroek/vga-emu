@@ -25,7 +25,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-                      build-essential cmake git ninja-build pkg-config
+                      build-essential cmake git ninja-build pkg-config \
+                      libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+                      libwayland-dev libxkbcommon-dev wayland-protocols
 
       - name: Cache SDL3 build
         id: cache-sdl
@@ -45,7 +47,7 @@ jobs:
         if: steps.cache-sdl.outputs.cache-hit != 'true'
         run: |
           cd SDL3
-          cmake -S . -B build -DSDL_VIDEO=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF
           cmake --build build --parallel
           cmake --install build
 
