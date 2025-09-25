@@ -12,7 +12,7 @@ name = "vga"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-sdl3 = [
+sdl = [
     "dep:sdl3",
     "dep:tokio",
 ]
@@ -22,16 +22,12 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
-test = [
-"dep:tokio"
-]
+test = ["dep:tokio"]
 tracing = ["dep:tracing"]
 
 [dependencies]
-web-time = "1.1.0"
-
 # feature "sdl3"
-sdl3 = { version = "0.14.16", optional = true, features = ["unsafe_textures"] }
+sdl3 = { version = "0.15.1", optional = true, features = ["unsafe_textures"] }
 tokio = { version = "1.47.1", optional = true, features = ["time", "rt"] }
 
 # feature "web"

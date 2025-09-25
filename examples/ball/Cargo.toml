@@ -25,7 +25,7 @@ web = [
     "dep:js-sys",
 ]
 sdl = [
-    "vga-emu/sdl3",
+    "vga-emu/sdl",
     "dep:tokio",
 ]
 

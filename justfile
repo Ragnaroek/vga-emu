@@ -6,7 +6,7 @@ build-sdl:
 	cargo build --features sdl
 
 build-sdl3:
-	cargo build --features sdl3
+	cargo build --features sdl
 
 build-sdl-tracing:
 	cargo build --release --features sdl,tracing

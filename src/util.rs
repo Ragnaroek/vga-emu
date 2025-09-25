@@ -258,7 +258,7 @@ pub fn copy_system_to_screen_masked_x(
     }
 }
 
-#[cfg(any(feature = "sdl3", feature = "test"))]
+#[cfg(any(feature = "sdl", feature = "test"))]
 /// task sleep that works with all the different backends
 pub async fn sleep(millis: u32) {
     tokio::time::sleep(std::time::Duration::from_millis(millis as u64)).await;
@@ -287,7 +287,7 @@ where
     wasm_bindgen_futures::spawn_local(future);
 }
 
-#[cfg(any(feature = "sdl3", feature = "test"))]
+#[cfg(any(feature = "sdl", feature = "test"))]
 /// async task spawner that works with all the different backends.
 /// The task is always spawned in the current thread to avoid
 /// Send issues.
