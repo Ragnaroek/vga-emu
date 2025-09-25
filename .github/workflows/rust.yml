@@ -45,7 +45,7 @@ jobs:
         if: steps.cache-sdl.outputs.cache-hit != 'true'
         run: |
           cd SDL3
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF
+          cmake -S . -B build -DSDL_VIDEO=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF
           cmake --build build --parallel
           cmake --install build
 
