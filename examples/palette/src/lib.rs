@@ -1,20 +1,22 @@
+#[cfg(feature = "web")]
+pub mod web;
+
 use std::env;
 use std::fs;
-use std::{thread::sleep, time::Duration};
 
-use vga::VGABuilder;
-use vga::util;
-use vga::{ColorReg, SCReg};
+use vga::util::{self, sleep};
+use vga::{ColorReg, SCReg, VGABuilder};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 200;
 const CUBE_SIZE: usize = 10;
 const PALETTE_SIZE: usize = 16;
 
-fn main() -> Result<(), String> {
+pub async fn start_palette() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .video_mode(0x13)
         .fullscreen(false)
+        .title("VGA Palette Example".to_string())
         .build()?;
 
     //enable Mode X
@@ -53,7 +55,7 @@ fn main() -> Result<(), String> {
         if vga.draw_frame() {
             return Ok(()); // quit
         }
-        sleep(Duration::from_millis(14)); // target 70 fps
+        sleep(14).await; // target 70 fps
     }
 }
 

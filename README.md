@@ -13,3 +13,4 @@ Supports different render backends. At the moment supported:
 | Code Example                 | Example Page | Description     | Screenshot     |
 |----------------------|-----------|-----------------|----------------|
 |[ball](examples/ball) | [Link](https://ragnaroek.github.io/vga-emu/examples/ball/)    |[Ball example from Michael Abrash's Graphics Programming Black Book](https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md)                                         |![ball](https://ragnaroek.github.io/vga-emu/examples/ball/example.png)              |
+|[palette](examples/palette) | [Link](https://ragnaroek.github.io/vga-emu/examples/palette/)    |[Palette example from Michael Abrash's Graphics Programming Black Book](https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md)                                         |![ball](https://ragnaroek.github.io/vga-emu/examples/palette/example.png)              |

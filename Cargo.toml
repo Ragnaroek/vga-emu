@@ -64,7 +64,3 @@ path = "src/bin/patternx.rs"
 [[bin]]
 name = "rectx"
 path = "src/bin/rectx.rs"
-
-[[bin]]
-name = "palette"
-path = "src/bin/palette.rs"
