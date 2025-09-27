@@ -1,0 +1,24 @@
+{
+  "name": "vga-palette",
+  "type": "module",
+  "collaborators": [
+    "Michael Bohn <spaceodyssey@gmx.de>"
+  ],
+  "description": "VGA Palette Example",
+  "version": "0.1.0",
+  "license": "GPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ragnaroek/vga-emu/examples/palette"
+  },
+  "files": [
+    "vgapalette_bg.wasm",
+    "vgapalette.js",
+    "vgapalette.d.ts"
+  ],
+  "main": "vgapalette.js",
+  "types": "vgapalette.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
