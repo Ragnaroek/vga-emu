@@ -23,6 +23,10 @@ impl InputMonitoring {
         false
     }
 
+    pub fn set_key_pressed(&mut self, key: NumCode, b: bool) {
+        self.keyboard.buttons[key as usize] = b;
+    }
+
     pub fn key_pressed(&self, key: NumCode) -> bool {
         self.keyboard.buttons[key as usize]
     }

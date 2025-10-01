@@ -54,10 +54,6 @@ name = "kite"
 path = "src/bin/kite.rs"
 
 [[bin]]
-name = "m320x400"
-path = "src/bin/m320x400.rs"
-
-[[bin]]
 name = "patternx"
 path = "src/bin/patternx.rs"
 

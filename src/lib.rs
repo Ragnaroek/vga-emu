@@ -23,7 +23,7 @@ pub use backend_web::RenderContext;
 use tracing::instrument;
 
 use std::sync::atomic::{AtomicU8, AtomicU16, Ordering};
-use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
+use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use input::InputMonitoring;
 use util::{get_height_regs, get_width_regs};
@@ -341,7 +341,7 @@ impl VGA {
         self.vga_emu.write_mem_chunk(offset, v)
     }
 
-    pub fn input_monitoring(&mut self) -> &mut InputMonitoring {
+    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
         self.rc.input_monitoring()
     }
 }

@@ -1,3 +1,4 @@
+use std::sync::{RwLock, RwLockWriteGuard};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -24,7 +25,7 @@ pub struct RenderContext {
     height: usize,
     fullscreen: bool,
     simulate_vertical_reset: bool,
-    input_monitoring: InputMonitoring,
+    input_monitoring: RwLock<InputMonitoring>,
 }
 
 impl RenderContext {
@@ -66,7 +67,7 @@ impl RenderContext {
             height,
             fullscreen: builder.fullscreen,
             simulate_vertical_reset: builder.simulate_vertical_reset,
-            input_monitoring: InputMonitoring::new(),
+            input_monitoring: RwLock::new(InputMonitoring::new()),
         })
     }
 
@@ -122,8 +123,10 @@ impl RenderContext {
         false
     }
 
-    pub fn input_monitoring(&mut self) -> &mut InputMonitoring {
-        &mut self.input_monitoring
+    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+        self.input_monitoring
+            .write()
+            .expect("write lock to InputMonitoring")
     }
 
     fn handle_keys(&mut self) -> (EmuInput, bool) {
@@ -195,27 +198,27 @@ impl RenderContext {
         if let Some(code) = keycode {
             let num_code = to_num_code(code);
             if num_code != NumCode::Bad {
-                self.input_monitoring.keyboard.buttons[num_code as usize] = false;
+                self.input_monitoring().keyboard.buttons[num_code as usize] = false;
             }
         }
     }
 
     fn clear_mouse_button(&mut self, sdl_mouse_btn: sdl3::mouse::MouseButton) {
         let button = to_mouse_button(sdl_mouse_btn);
-        self.input_monitoring.mouse.buttons[button as usize] = false;
+        self.input_monitoring().mouse.buttons[button as usize] = false;
     }
 
     fn set_mouse_button(&mut self, sdl_mouse_btn: sdl3::mouse::MouseButton) {
         let button = to_mouse_button(sdl_mouse_btn);
-        self.input_monitoring.mouse.buttons[button as usize] = true;
+        self.input_monitoring().mouse.buttons[button as usize] = true;
     }
 
     fn set_key(&mut self, keycode: Option<Keycode>) {
         if let Some(code) = keycode {
             let num_code = to_num_code(code);
             if num_code != NumCode::Bad {
-                self.input_monitoring.keyboard.buttons[num_code as usize] = true;
-                self.input_monitoring.keyboard.update_last_value(num_code);
+                self.input_monitoring().keyboard.buttons[num_code as usize] = true;
+                self.input_monitoring().keyboard.update_last_value(num_code);
             }
         }
     }

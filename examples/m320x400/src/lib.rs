@@ -1,6 +1,8 @@
+#[cfg(feature = "web")]
+pub mod web;
+
 //Example from https://www.phatcode.net/res/224/files/html/ch31/31-03.html (LISTING 31.3)
-use std::{thread::sleep, time::Duration};
-use vga::{CRTReg, GCReg, SCReg, VGABuilder, input::NumCode};
+use vga::{CRTReg, GCReg, SCReg, VGABuilder, input::NumCode, util::sleep};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -26,9 +28,10 @@ fn new_line(
     }
 }
 
-pub fn main() -> Result<(), String> {
+pub async fn start_m320x400() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .video_mode(0x13)
+        .title("VGA m320x400 Example".to_string())
         .fullscreen(false)
         .build()?;
 
@@ -90,7 +93,7 @@ pub fn main() -> Result<(), String> {
                     return Ok(()); // quit
                 }
 
-                sleep(Duration::from_millis(14)); // target 70 fps
+                sleep(14).await; // target 70 fps
             }
         }
     }

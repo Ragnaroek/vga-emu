@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
@@ -14,7 +14,7 @@ pub struct RenderContext {
     ctx: CanvasRenderingContext2d,
     fullscreen: bool,
     simulate_vertical_reset: bool,
-    input_monitoring: Rc<InputMonitoring>,
+    input_monitoring: Arc<RwLock<InputMonitoring>>,
 }
 
 struct WebBuffer {
@@ -45,7 +45,7 @@ impl RenderContext {
 
         // setup input monitoring
 
-        let input_monitoring = Rc::new(InputMonitoring::new());
+        let input_monitoring = Arc::new(RwLock::new(InputMonitoring::new()));
 
         let mon_down = input_monitoring.clone();
         let mon_up = input_monitoring.clone();
@@ -141,30 +141,37 @@ impl RenderContext {
         false
     }
 
-    pub fn input_monitoring(&mut self) -> &mut InputMonitoring {
-        Rc::get_mut(&mut self.input_monitoring).unwrap()
+    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+        self.input_monitoring
+            .write()
+            .expect("write access to InputMonitoring")
     }
 }
 
-fn handle_key(up: bool, input: Rc<InputMonitoring>, event: web_sys::Event) {
-    // TODO impl key handling for web
-    /*
+fn handle_key(up: bool, input: Arc<RwLock<InputMonitoring>>, event: web_sys::Event) {
     let keyboard_event = event
         .dyn_into::<web_sys::KeyboardEvent>()
         .expect("a KeyboardEvent");
     let key = to_num_code(&keyboard_event.key());
-    input.keyboard.buttons[key as usize] = !up;
-    */
+    if key != NumCode::Bad {
+        input
+            .write()
+            .expect("input write")
+            .set_key_pressed(key, !up);
+    }
 }
 
 fn to_num_code(key: &str) -> NumCode {
+    //panic!("key = {}", key);
     match key {
         "ArrowUp" => NumCode::UpArrow,
         "ArrowDown" => NumCode::DownArrow,
         "ArrowLeft" => NumCode::LeftArrow,
         "ArrowRight" => NumCode::RightArrow,
         "Control" => NumCode::Control,
+        "Enter" => NumCode::Return,
         " " => NumCode::Space,
+        // TODO map all key names to NumCode!
         _ => NumCode::Bad,
     }
 }

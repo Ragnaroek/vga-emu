@@ -11,6 +11,7 @@ build-sdl-tracing:
 build-sdl-examples:
 	cd examples/ball && just build-sdl
 	cd examples/palette && just build-sdl
+	cd examples/m320x400 && just build-sdl
 
 test:
     cargo test --features test
