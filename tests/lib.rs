@@ -146,7 +146,7 @@ fn test_set_color() {
     }
 
     assert_eq!(vga.get_color_reg(ColorReg::AddressWriteMode), 1);
-    assert_eq!(vga.get_color_palette_256(0), 0x3F3E3D);
+    assert_eq!(vga.get_color_palette_256_value(0), 0x3F3E3D);
 
     //TODO Write colors here
     //check auto-increment

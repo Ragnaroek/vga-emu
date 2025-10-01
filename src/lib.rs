@@ -8,13 +8,16 @@ pub mod util;
 
 #[cfg(feature = "sdl")]
 pub use backend_sdl::VGAHandle;
-
 #[cfg(feature = "web")]
 pub use backend_web::VGAHandle;
 
-use input::InputMonitoring;
+#[cfg(feature = "tracing")]
+use tracing::instrument;
+
 use std::sync::atomic::{AtomicU16, AtomicU64, AtomicU8, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
+
+use input::InputMonitoring;
 use util::{get_height_regs, get_width_regs};
 
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
@@ -62,7 +65,7 @@ pub struct VGARegs {
 pub struct VGA {
     regs: VGARegs,
     palette_256: RwLock<[u32; 256]>,
-    pub mem: Vec<Vec<AtomicU8>>,
+    pub mem: Mutex<Vec<Vec<u8>>>,
 }
 
 //Sequence Controller Register
@@ -213,10 +216,10 @@ impl VGA {
     /// Can be used for unit-testing.
     pub fn setup_no_backend(video_mode: u8) -> VGA {
         let mem = vec![
-            init_atomic_u8_vec(PLANE_SIZE),
-            init_atomic_u8_vec(PLANE_SIZE),
-            init_atomic_u8_vec(PLANE_SIZE),
-            init_atomic_u8_vec(PLANE_SIZE),
+            vec![0; PLANE_SIZE],
+            vec![0; PLANE_SIZE],
+            vec![0; PLANE_SIZE],
+            vec![0; PLANE_SIZE],
         ];
 
         let regs = VGARegs {
@@ -246,7 +249,7 @@ impl VGA {
         VGA {
             regs,
             palette_256: RwLock::new(init_default_256_palette()),
-            mem,
+            mem: Mutex::new(mem),
         }
     }
 
@@ -283,6 +286,7 @@ impl VGA {
         self.regs.get_gc_data(reg)
     }
 
+    #[cfg_attr(feature = "tracing", instrument(skip_all))]
     pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
         self.regs.set_crt_data(reg, v);
     }
@@ -335,7 +339,7 @@ impl VGA {
             let reads = self.regs.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressReadMode) as usize;
             let color_part_shift = (2 - reads) * 8;
-            let color = self.get_color_palette_256(ix);
+            let color = self.get_color_palette_256_value(ix);
             let word = color & (0xFF as u32) << color_part_shift;
 
             if reads == 2 {
@@ -350,9 +354,13 @@ impl VGA {
     }
 
     // Set through set_color_reg, this accesses the 256 palette directly
-    pub fn get_color_palette_256(&self, ix: usize) -> u32 {
+    pub fn get_color_palette_256_value(&self, ix: usize) -> u32 {
         let table = self.palette_256.read().unwrap();
         table[ix]
+    }
+
+    pub fn get_palette_256(&self) -> RwLockReadGuard<[u32; 256]> {
+        self.palette_256.read().unwrap()
     }
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
@@ -376,6 +384,7 @@ impl VGA {
         let bit_mask = self.regs.get_gc_data(GCReg::BitMask);
         gc_mode &= 0x03;
 
+        let mut mem_lock = self.mem.lock().unwrap();
         for i in 0..4 {
             if (dest & (1 << i)) != 0 {
                 let v = if gc_mode == 0x01 {
@@ -384,7 +393,7 @@ impl VGA {
                     let v_latch = self.regs.latch_reg[i].load(Ordering::Acquire);
                     v_in & bit_mask | (v_latch & !bit_mask)
                 };
-                self.mem[i][offset].swap(v, Ordering::Relaxed);
+                mem_lock[i][offset] = v;
             }
         }
     }
@@ -404,23 +413,33 @@ impl VGA {
         } else {
             (self.regs.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
         };
+        let lock_mem = self.mem.lock().unwrap();
         for i in 0..4 {
-            self.regs.latch_reg[i].swap(
-                self.mem[i][offset].load(Ordering::Acquire),
-                Ordering::AcqRel,
-            );
+            self.regs.latch_reg[i].swap(lock_mem[i][offset], Ordering::AcqRel);
         }
         self.regs.latch_reg[select].load(Ordering::Acquire)
     }
 
+    pub fn mem_lock(&self) -> MutexGuard<Vec<Vec<u8>>> {
+        self.mem.lock().unwrap()
+    }
+
+    pub fn raw_read_mem_with_lock(
+        &self, lock: &MutexGuard<Vec<Vec<u8>>>, plane: usize, offset: usize,
+    ) -> u8 {
+        lock[plane][offset]
+    }
+
     //useful for testing, inspect the memory for a given plane
     pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
-        self.mem[plane][offset].load(Ordering::Relaxed)
+        let lock_mem = self.mem.lock().unwrap();
+        lock_mem[plane][offset]
     }
 
     //useful for testing, set the memory in a given plane
     pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
-        self.mem[plane][offset].swap(v, Ordering::AcqRel);
+        let mut lock_mem = self.mem.lock().unwrap();
+        lock_mem[plane][offset] = v;
     }
 }
 

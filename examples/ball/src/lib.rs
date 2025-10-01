@@ -83,10 +83,10 @@ fn initial_render_state() -> RenderState {
 }
 
 pub fn start_ball() -> Result<(), String> {
-    let (vga, handle) = VGA::setup(0x10, false)?;
+    let (mut vga, handle) = VGA::setup(0x10, false)?;
 
-    draw_border(&vga, PAGE0_OFFSET);
-    draw_border(&vga, PAGE1_OFFSET);
+    draw_border(&mut vga, PAGE0_OFFSET);
+    draw_border(&mut vga, PAGE1_OFFSET);
 
     let plane_1_data = vec![
         0x00, 0x3c, 0x00, 0x01, 0xff, 0x80, //

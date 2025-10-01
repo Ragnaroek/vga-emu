@@ -142,6 +142,7 @@ pub fn start_sdl(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
     'running: loop {
         let mem_offset = mem_offset(&vga, &options);
         let frame_start = Instant::now();
+
         set_de(&vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             if linear {
@@ -162,6 +163,7 @@ pub fn start_sdl(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
             canvas.clear();
             canvas.copy(&texture, None, Some(Rect::new(0, 0, w as u32, h as u32)))
         })?;
+
         if options.show_frame_rate {
             let surface = font
                 .as_ref()
@@ -181,10 +183,12 @@ pub fn start_sdl(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Res
                 )
             })?;
         }
+
         handle.update_canvas(|mut canvas| {
             canvas.present();
             Ok(())
         })?;
+
         set_de(&vga, false);
 
         for event in event_pump.poll_iter() {

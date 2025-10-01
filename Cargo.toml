@@ -19,6 +19,7 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
+tracing = ["dep:tracing"]
 
 [dependencies]
 async-std = { version = "1.13.0", features = ["unstable"] }
@@ -38,6 +39,10 @@ web-sys = { version = "0.3.76", optional = true, features = [
     'ImageData',
     'KeyboardEvent',
     'console',
+] }
+# feature tracing
+tracing = { version = "0.1.41", optional = true, default-features = false, features = [
+    "attributes",
 ] }
 
 [[bin]]
