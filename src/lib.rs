@@ -23,14 +23,9 @@ use util::{get_height_regs, get_width_regs};
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
 pub const VERTICAL_RESET_MICRO: u64 = 635;
 
-#[cfg(feature = "sdl")]
-const DEBUG_HEIGHT: usize = 20;
-
-pub const FRAME_RATE_SAMPLES: usize = 100;
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
 pub struct Options {
-    pub show_frame_rate: bool,
     pub start_addr_override: Option<usize>,
     pub input_monitoring: Option<Arc<Mutex<InputMonitoring>>>,
     /// This counter is increment on each frame
@@ -40,7 +35,6 @@ pub struct Options {
 impl Default for Options {
     fn default() -> Self {
         Options {
-            show_frame_rate: false,
             //set in debug mode to ignore the start address set in the vga
             start_addr_override: None,
             input_monitoring: None,
@@ -213,7 +207,6 @@ impl VGARegs {
 
 pub struct VGABuilder {
     video_mode: u8,
-    show_frame_rate: bool,
     fullscreen: bool,
 }
 
@@ -221,18 +214,12 @@ impl VGABuilder {
     pub fn new() -> VGABuilder {
         VGABuilder {
             video_mode: 0x10,
-            show_frame_rate: false,
             fullscreen: true,
         }
     }
 
     pub fn video_mode(&mut self, mode: u8) -> &mut VGABuilder {
         self.video_mode = mode;
-        self
-    }
-
-    pub fn show_frame_rate(&mut self, show: bool) -> &mut VGABuilder {
-        self.show_frame_rate = show;
         self
     }
 
@@ -398,7 +385,7 @@ impl VGA {
         table[ix]
     }
 
-    pub fn get_palette_256(&self) -> RwLockReadGuard<[u32; 256]> {
+    pub fn get_palette_256(&self) -> RwLockReadGuard<'_, [u32; 256]> {
         self.palette_256.read().unwrap()
     }
 
@@ -455,7 +442,7 @@ impl VGA {
         self.regs.latch_reg[select].load(Ordering::Acquire)
     }
 
-    pub fn mem_lock(&self) -> MutexGuard<Vec<Vec<u8>>> {
+    pub fn mem_lock(&self) -> MutexGuard<'_, Vec<Vec<u8>>> {
         self.mem.lock().unwrap()
     }
 
