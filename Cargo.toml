@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.6.3"
+version = "0.7.0"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
@@ -27,10 +27,10 @@ sdl2 = { version = "0.37.0", optional = true, default-features = false, features
     "ttf",
 ] }
 # feature "web"
-wasm-bindgen = { version = "0.2.95", optional = true }
-wasm-bindgen-futures = { version = "0.4.45", optional = true }
-js-sys = { version = "0.3.72", optional = true }
-web-sys = { version = "0.3.72", optional = true, features = [
+wasm-bindgen = { version = "0.2.99", optional = true }
+wasm-bindgen-futures = { version = "0.4.49", optional = true }
+js-sys = { version = "0.3.76", optional = true }
+web-sys = { version = "0.3.76", optional = true, features = [
     'Document',
     'Window',
     'CanvasRenderingContext2d',

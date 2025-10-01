@@ -17,15 +17,17 @@ path = "src/main.rs"
 
 [features]
 sdl = ["vga-emu/sdl"]
-web = ["vga-emu/web", "dep:wasm-bindgen", "dep:console_error_panic_hook", "dep:web-sys"]
+web = [
+    "vga-emu/web",
+    "dep:wasm-bindgen",
+    "dep:console_error_panic_hook",
+    "dep:web-sys",
+]
 
 [dependencies]
-vga-emu = {path = "../../"}
-async-std = { version = "1.12.0", features = ["unstable"] }
+vga-emu = { path = "../../" }
+async-std = { version = "1.13.0", features = ["unstable"] }
 # feature web
-wasm-bindgen = { version = "0.2.92", optional = true}
+wasm-bindgen = { version = "0.2.99", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-web-sys = { version = "0.3.69", optional = true,  features = [
-  'console'
-]}
-
+web-sys = { version = "0.3.76", optional = true, features = ['console'] }

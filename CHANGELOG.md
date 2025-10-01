@@ -4,6 +4,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.7.0]
+- Fullscreen toggle support via ALT+F
+
 # [0.6.1]
 - last_ascii in Keyboard
 
@@ -18,7 +21,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - sdl2 0.36.0
 
 # [0.5.0]
-- web support 
+- web support
 
 # [0.4.1]
 - optional sdl dependency
