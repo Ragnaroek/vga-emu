@@ -1,5 +1,5 @@
 /// Contains common functionality shared across all backend implementations
-use crate::{CRTReg, VGA, AttributeReg, Options};
+use crate::{AttributeReg, CRTReg, Options, VGA};
 
 #[derive(Debug)]
 pub struct RGB {
@@ -9,18 +9,17 @@ pub struct RGB {
 }
 
 pub fn rgb(r: u8, g: u8, b: u8) -> RGB {
-    RGB{r, g, b}
+    RGB { r, g, b }
 }
 
 pub trait PixelBuffer {
-    const PIXEL_WIDTH : usize;
+    const PIXEL_WIDTH: usize;
     fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8);
 }
 
 /// pitch = length of one row in bytes
 pub fn render_planar<T: PixelBuffer + ?Sized>(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, 
-    buffer: &mut T, pitch: usize,
+    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T, pitch: usize,
 ) {
     let mut x: usize = 0;
     let mut y: usize = 0;
@@ -49,7 +48,7 @@ pub fn render_planar<T: PixelBuffer + ?Sized>(
                     let color = default_16_color(pixel);
                     let offset = y * pitch + x * T::PIXEL_WIDTH;
                     buffer.set_rgb(offset, color.r, color.g, color.b);
- 
+
                     x += 1;
                 }
             }
@@ -61,8 +60,7 @@ pub fn render_planar<T: PixelBuffer + ?Sized>(
 }
 
 pub fn render_linear<T: PixelBuffer + ?Sized>(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize,
-    buffer: &mut T,
+    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize, buffer: &mut T,
 ) {
     let mut mem_offset = mem_offset_p;
     let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
@@ -76,10 +74,15 @@ pub fn render_linear<T: PixelBuffer + ?Sized>(
                     let v = vga.raw_read_mem(p, mem_offset + x_byte);
                     let color = vga.get_color_palette_256(v as usize);
                     for _ in 0..v_stretch {
-                        // each color part (RGB) contains the high-order 6 bit values. 
+                        // each color part (RGB) contains the high-order 6 bit values.
                         // To get a "real" RGB value for display the value have to shifted
                         // by 2 bits (otherwise the color will be dimmed)
-                        buffer.set_rgb(buffer_offset, ((color & 0xFF0000) >> 14) as u8, ((color & 0x00FF00) >> 6) as u8, ((color & 0x0000FF) << 2) as u8);
+                        buffer.set_rgb(
+                            buffer_offset,
+                            ((color & 0xFF0000) >> 14) as u8,
+                            ((color & 0x00FF00) >> 6) as u8,
+                            ((color & 0x0000FF) << 2) as u8,
+                        );
                         buffer_offset += T::PIXEL_WIDTH;
                     }
                 }

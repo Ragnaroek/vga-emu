@@ -3,16 +3,19 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use sdl2::keyboard::Keycode;
 use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::ttf;
 
+use crate::backend::{is_linear, mem_offset, render_linear, render_planar, PixelBuffer};
 use crate::input::{InputMonitoring, NumCode};
-use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar, mem_offset};
-use crate::util::{get_width, get_height, set_de, set_vr};
-use crate::{ CRTReg, VGA, Options, FRAME_RATE_SAMPLES, DEBUG_HEIGHT, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO };
+use crate::util::{get_height, get_width, set_de, set_vr};
+use crate::{
+    CRTReg, Options, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, TARGET_FRAME_RATE_MICRO,
+    VERTICAL_RESET_MICRO, VGA,
+};
 
 pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
@@ -143,8 +146,9 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     Ok(())
 }
 
-impl PixelBuffer for [u8] { // TODO Use dedicated SDLBuffer here instead of [u8]
-    const PIXEL_WIDTH : usize = 3;
+impl PixelBuffer for [u8] {
+    // TODO Use dedicated SDLBuffer here instead of [u8]
+    const PIXEL_WIDTH: usize = 3;
     fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8) {
         self[offset] = r;
         self[offset + 1] = g;
@@ -159,7 +163,7 @@ fn update_inputs(inputs: &Option<Arc<Mutex<InputMonitoring>>>, event: Event) {
         let im = &mut *mon.lock().unwrap();
         match event {
             Event::KeyUp { keycode, .. } => clear_key(keycode, im),
-            Event::KeyDown { keycode, .. } => {set_key(keycode, im)},
+            Event::KeyDown { keycode, .. } => set_key(keycode, im),
             _ => {} //ignore
         }
     }
@@ -167,15 +171,20 @@ fn update_inputs(inputs: &Option<Arc<Mutex<InputMonitoring>>>, event: Event) {
 
 fn clear_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
     if let Some(code) = keycode {
-        state.keyboard.buttons[to_num_code(code) as usize] = false;
+        let num_code = to_num_code(code);
+        if num_code != NumCode::Bad {
+            state.keyboard.buttons[num_code as usize] = false;
+        }
     }
 }
 
 fn set_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
     if let Some(code) = keycode {
         let num_code = to_num_code(code);
-        state.keyboard.buttons[num_code as usize] = true;
-        state.keyboard.update_last_value(num_code);
+        if num_code != NumCode::Bad {
+            state.keyboard.buttons[num_code as usize] = true;
+            state.keyboard.update_last_value(num_code);
+        }
     }
 }
 

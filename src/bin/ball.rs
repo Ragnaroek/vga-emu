@@ -4,7 +4,7 @@
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
+use vga::{AttributeReg, CRTReg, GCReg, GeneralReg, SCReg};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -30,10 +30,10 @@ const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
     BALL_2_CONTORL,
     BALL_3_CONTORL,
 ];
-const PANNING_CONTROL_STRING : [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
+const PANNING_CONTROL_STRING: [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
 
 const UPDATE_RATE_SAMPLES: usize = 1000;
-const POLL_WAIT_MICROS : u64 = 500;
+const POLL_WAIT_MICROS: u64 = 500;
 
 struct PanningState {
     hpan: i16,
@@ -54,7 +54,6 @@ fn initial_panning_state() -> PanningState {
         panning_control: 0,
     }
 }
-
 
 pub fn main() {
     let vga = vga::new(0x10);
@@ -158,7 +157,7 @@ pub fn main() {
         let mut ball_y_inc = [8, 8, 8, 8];
         let mut ball_rep = [1, 1, 1, 1];
         let mut ball_control = [0, 0, 0, 0];
-        
+
         let mut current_page = PAGE1;
         let mut current_page_offset = PAGE1_OFFSET;
 
@@ -211,18 +210,22 @@ pub fn main() {
             }
 
             adjust_panning(&mut panning_state);
-            
+
             wait_display_enable(&vga_t);
 
             // Flip to new page by setting new start adress
-            let addr_parts = (current_page_offset + panning_state.panning_start_offset).to_le_bytes();
+            let addr_parts =
+                (current_page_offset + panning_state.panning_start_offset).to_le_bytes();
             vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
             vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
-            
+
             wait_vsync(&vga_t);
 
-            vga_t.set_attribute_reg(AttributeReg::HorizontalPixelPanning, panning_state.hpan as u8);
-            
+            vga_t.set_attribute_reg(
+                AttributeReg::HorizontalPixelPanning,
+                panning_state.hpan as u8,
+            );
+
             //flip pages for next loop
             current_page ^= 1;
             if current_page == 0 {
@@ -233,14 +236,17 @@ pub fn main() {
         }
     });
 
-    let options : vga::Options = vga::Options { show_frame_rate: true, ..Default::default() };
+    let options: vga::Options = vga::Options {
+        show_frame_rate: true,
+        ..Default::default()
+    };
     /*
     enable this for debugging:
     screen::start_debug_planar_mode(
         vga_m,
         672,
         780,
-        options, 
+        options,
     ).unwrap();*/
     vga_m.start(options).unwrap();
 }
@@ -312,17 +318,18 @@ fn draw_border_block(vga: &vga::VGA, offset: usize) {
     }
 }
 
-fn adjust_panning(state : &mut PanningState) {
+fn adjust_panning(state: &mut PanningState) {
     state.panning_rep -= 1;
     if state.panning_rep <= 0 {
         let ax = PANNING_CONTROL_STRING[state.panning_control];
-        if ax == 0 {//end of control string
+        if ax == 0 {
+            //end of control string
             state.panning_control = 0;
         }
         state.panning_rep = PANNING_CONTROL_STRING[state.panning_control];
-        state.panning_x_inc = PANNING_CONTROL_STRING[state.panning_control+1];
-        state.panning_y_inc = PANNING_CONTROL_STRING[state.panning_control+2];
-        state.panning_control += 3;        
+        state.panning_x_inc = PANNING_CONTROL_STRING[state.panning_control + 1];
+        state.panning_y_inc = PANNING_CONTROL_STRING[state.panning_control + 2];
+        state.panning_control += 3;
     }
 
     //horizontal pan

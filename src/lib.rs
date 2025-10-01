@@ -1,14 +1,14 @@
-pub mod util;
-pub mod input;
 pub mod backend;
 #[cfg(feature = "sdl")]
 pub mod backend_sdl;
 #[cfg(feature = "web")]
 pub mod backend_web;
+pub mod input;
+pub mod util;
 
-use std::sync::atomic::{AtomicU8, AtomicU16, Ordering, AtomicU64};
-use std::sync::{RwLock, Arc, Mutex};
 use input::InputMonitoring;
+use std::sync::atomic::{AtomicU16, AtomicU64, AtomicU8, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
 pub const VERTICAL_RESET_MICRO: u64 = 635;
@@ -17,8 +17,7 @@ const DEBUG_HEIGHT: usize = 20;
 pub const FRAME_RATE_SAMPLES: usize = 100;
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
-pub struct Options
- {
+pub struct Options {
     pub show_frame_rate: bool,
     pub start_addr_override: Option<usize>,
     pub input_monitoring: Option<Arc<Mutex<InputMonitoring>>>,
@@ -66,11 +65,11 @@ pub fn new(video_mode: u8) -> VGA {
         video_mode: AtomicU8::new(video_mode),
         sc_reg: init_atomic_u8_vec(5),
         gc_reg: init_atomic_u8_vec(9),
-        crt_reg:  init_atomic_u8_vec(25),
+        crt_reg: init_atomic_u8_vec(25),
         latch_reg: init_atomic_u8_vec(4),
         general_reg: init_atomic_u8_vec(4),
         attribute_reg: init_atomic_u8_vec(21),
-        
+
         color_write_reads: AtomicU16::new(0),
         color_reg: init_atomic_u8_vec(4),
         palette_256: RwLock::new(init_default_256_palette()),
@@ -84,7 +83,7 @@ pub fn new(video_mode: u8) -> VGA {
         0x10 => setup_mode_10(&vga),
         0x13 => setup_mode_13(&vga),
         _ => panic!("video mode {:x}h not yet implemented", vga.get_video_mode()),
-    }    
+    }
 
     vga
 }
@@ -218,7 +217,9 @@ impl VGA {
     /// Shows the full content of the VGA buffer as one big screen (for debugging) for
     /// the planar modes. width and height depends on your virtual screen size (640x819 if
     /// you did not change the default settings)
-    pub fn start_debug_planar_mode(self: Arc<Self>, w: usize, h: usize, options: Options) -> Result<(), String> {
+    pub fn start_debug_planar_mode(
+        self: Arc<Self>, w: usize, h: usize, options: Options,
+    ) -> Result<(), String> {
         let mut debug_options = options;
         debug_options.start_addr_override = Some(0);
 
@@ -226,7 +227,7 @@ impl VGA {
         set_vertical_display_end(&self, h as u32);
 
         self.start(debug_options)
-}
+    }
 
     pub fn set_sc_data(&self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
@@ -272,17 +273,17 @@ impl VGA {
         self.video_mode.load(Ordering::Acquire)
     }
 
-    pub fn set_color_reg(&self, reg: ColorReg, v: u8) {        
+    pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
         self.color_reg[reg as usize].swap(v, Ordering::AcqRel);
         if reg == ColorReg::Data {
             let writes = self.color_write_reads.fetch_add(1, Ordering::AcqRel);
             let ix = self.get_color_reg(ColorReg::AddressWriteMode) as usize;
-            let color_part_shift = (2 - writes) * 8;           
-            
+            let color_part_shift = (2 - writes) * 8;
+
             let mut table = self.palette_256.write().unwrap();
             table[ix] &= !((0xFF as u32) << color_part_shift);
             table[ix] |= ((v & 0x3F) as u32) << color_part_shift;
-          
+
             if writes == 2 {
                 self.color_reg[ColorReg::AddressWriteMode as usize].fetch_add(1, Ordering::AcqRel);
                 self.color_write_reads.store(0, Ordering::Relaxed);
@@ -296,8 +297,8 @@ impl VGA {
             let ix = self.get_color_reg(ColorReg::AddressReadMode) as usize;
             let color_part_shift = (2 - reads) * 8;
             let color = self.get_color_palette_256(ix);
-            let word = color & (0xFF as u32) << color_part_shift;      
-             
+            let word = color & (0xFF as u32) << color_part_shift;
+
             if reads == 2 {
                 self.color_reg[ColorReg::AddressReadMode as usize].fetch_add(1, Ordering::AcqRel);
                 self.color_write_reads.store(0, Ordering::Relaxed);
@@ -364,7 +365,10 @@ impl VGA {
             (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
         };
         for i in 0..4 {
-            self.latch_reg[i].swap(self.mem[i][offset].load(Ordering::Acquire), Ordering::AcqRel);
+            self.latch_reg[i].swap(
+                self.mem[i][offset].load(Ordering::Acquire),
+                Ordering::AcqRel,
+            );
         }
         self.latch_reg[select].load(Ordering::Acquire)
     }
@@ -418,14 +422,14 @@ fn init_default_256_palette() -> [u32; 256] {
 //convenience functions
 
 pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
-    vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width-1)/8) as u8);
+    vga.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
 pub fn set_vertical_display_end(vga: &VGA, height: u32) {
-    let h = height-1;
+    let h = height - 1;
     vga.set_crt_data(CRTReg::VerticalDisplayEnd, h as u8);
     let bit_8 = ((h & 0x100) >> 8) as u8;
     let bit_9 = ((h & 0x200) >> 9) as u8;
     let overflow = bit_9 << 6 | bit_8 << 1;
-    vga.set_crt_data(CRTReg::Overflow, overflow); 
+    vga.set_crt_data(CRTReg::Overflow, overflow);
 }
