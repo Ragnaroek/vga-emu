@@ -1,6 +1,6 @@
 use std::env;
 use std::fs;
-use std::sync::Arc;
+use std::{thread::sleep, time::Duration};
 
 use vga::VGABuilder;
 use vga::util;
@@ -12,7 +12,7 @@ const CUBE_SIZE: usize = 10;
 const PALETTE_SIZE: usize = 16;
 
 fn main() -> Result<(), String> {
-    let (vga, handle) = VGABuilder::new()
+    let mut vga = VGABuilder::new()
         .video_mode(0x13)
         .fullscreen(false)
         .build()?;
@@ -49,11 +49,12 @@ fn main() -> Result<(), String> {
         }
     }
 
-    let vga_m = Arc::new(vga);
-
-    let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, Default::default()).unwrap();
-    Ok(())
+    loop {
+        if vga.draw_frame() {
+            return Ok(()); // quit
+        }
+        sleep(Duration::from_millis(14)); // target 70 fps
+    }
 }
 
 pub fn set_palette(vga: &vga::VGA, palette: &[u8]) {

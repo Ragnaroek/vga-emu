@@ -1,47 +1,36 @@
+#[cfg(test)]
+#[path = "./lib_test.rs"]
+mod lib_test;
+
 pub mod backend;
-#[cfg(feature = "sdl")]
-pub mod backend_sdl;
+#[cfg(feature = "sdl3")]
+pub mod backend_sdl3;
+#[cfg(feature = "test")]
+pub mod backend_test;
 #[cfg(feature = "web")]
 pub mod backend_web;
 pub mod input;
 pub mod util;
 
-#[cfg(feature = "sdl")]
-pub use backend_sdl::VGAHandle;
+#[cfg(feature = "sdl3")]
+pub use backend_sdl3::RenderContext;
+#[cfg(feature = "test")]
+pub use backend_test::RenderContext;
 #[cfg(feature = "web")]
 pub use backend_web::VGAHandle;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use std::sync::atomic::{AtomicU8, AtomicU16, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
+use std::sync::atomic::{AtomicU8, AtomicU16, Ordering};
+use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 use input::InputMonitoring;
 use util::{get_height_regs, get_width_regs};
 
-pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
 pub const VERTICAL_RESET_MICRO: u64 = 635;
 
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
-
-pub struct Options {
-    pub start_addr_override: Option<usize>,
-    pub input_monitoring: Option<Arc<Mutex<InputMonitoring>>>,
-    /// This counter is increment on each frame
-    pub frame_count: Arc<AtomicU64>,
-}
-
-impl Default for Options {
-    fn default() -> Self {
-        Options {
-            //set in debug mode to ignore the start address set in the vga
-            start_addr_override: None,
-            input_monitoring: None,
-            frame_count: Arc::new(AtomicU64::new(0)),
-        }
-    }
-}
 
 pub struct VGARegs {
     sc_reg: Vec<AtomicU8>,
@@ -57,9 +46,15 @@ pub struct VGARegs {
 }
 
 pub struct VGA {
+    vga_emu: VGAEmu,
+    rc: RenderContext,
+}
+
+pub struct VGAEmu {
     regs: VGARegs,
     palette_256: RwLock<[u32; 256]>,
     pub mem: Mutex<Vec<Vec<u8>>>,
+    pub start_addr_override: Option<usize>,
 }
 
 //Sequence Controller Register
@@ -152,13 +147,6 @@ pub enum ColorReg {
     State = 0x03,
 }
 
-fn setup_backend(width: usize, height: usize, builder: &VGABuilder) -> Result<VGAHandle, String> {
-    #[cfg(feature = "sdl")]
-    return backend_sdl::setup_sdl(width, height, builder);
-    #[cfg(feature = "web")]
-    return backend_web::setup_web(width, height, builder);
-}
-
 impl VGARegs {
     pub fn set_sc_data(&self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
@@ -208,6 +196,8 @@ impl VGARegs {
 pub struct VGABuilder {
     video_mode: u8,
     fullscreen: bool,
+    simulate_vertical_reset: bool,
+    start_addr_override: Option<usize>,
 }
 
 impl VGABuilder {
@@ -215,32 +205,142 @@ impl VGABuilder {
         VGABuilder {
             video_mode: 0x10,
             fullscreen: true,
+            simulate_vertical_reset: false,
+            start_addr_override: None,
         }
     }
 
-    pub fn video_mode(&mut self, mode: u8) -> &mut VGABuilder {
+    pub fn video_mode(mut self, mode: u8) -> VGABuilder {
         self.video_mode = mode;
         self
     }
 
-    pub fn fullscreen(&mut self, fullscreen: bool) -> &mut VGABuilder {
+    pub fn fullscreen(mut self, fullscreen: bool) -> VGABuilder {
         self.fullscreen = fullscreen;
         self
     }
 
-    pub fn build(&self) -> Result<(VGA, VGAHandle), String> {
-        VGA::setup(self)
+    /// If activated this will simulate the vertical reset. Some
+    /// programs may use this and observe the corresponding register
+    /// status changes.
+    /// By default this is not enabled.
+    pub fn simulate_vertical_reset(mut self) -> VGABuilder {
+        self.simulate_vertical_reset = true;
+        self
     }
 
-    /// Returns a VGA that is not attached to any backend.
-    /// Can be used for unit-testing.
-    pub fn build_no_backend(&self) -> VGA {
-        VGA::setup_vga(self)
+    pub fn start_addr_override(mut self, over: usize) -> VGABuilder {
+        self.start_addr_override = Some(over);
+        self
+    }
+
+    /// Constructs a VGA depending on the compile options (see
+    /// features list for available options)
+    pub fn build(self) -> Result<VGA, String> {
+        VGA::setup(self)
     }
 }
 
 impl VGA {
-    pub fn setup_vga(builder: &VGABuilder) -> VGA {
+    pub fn setup(builder: VGABuilder) -> Result<VGA, String> {
+        let vga_emu = VGAEmu::new(&builder);
+
+        let width = get_width_regs(&vga_emu.regs);
+        let height = get_height_regs(&vga_emu.regs);
+        let rc = RenderContext::init(width as usize, height as usize, builder)?;
+
+        Ok(VGA { vga_emu, rc })
+    }
+
+    pub fn draw_frame(&mut self) -> bool {
+        self.rc.draw_frame(&self.vga_emu)
+    }
+
+    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
+        self.vga_emu.regs.set_sc_data(reg, v);
+    }
+
+    pub fn get_sc_data(&self, reg: SCReg) -> u8 {
+        self.vga_emu.regs.get_sc_data(reg)
+    }
+
+    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
+        self.vga_emu.regs.set_gc_data(reg, v);
+    }
+
+    pub fn get_gc_data(&self, reg: GCReg) -> u8 {
+        self.vga_emu.regs.get_gc_data(reg)
+    }
+
+    #[cfg_attr(feature = "tracing", instrument(skip_all))]
+    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
+        self.vga_emu.regs.set_crt_data(reg, v);
+    }
+
+    pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
+        self.vga_emu.regs.get_crt_data(reg)
+    }
+
+    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
+        self.vga_emu.regs.set_general_reg(reg, v);
+    }
+
+    pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
+        self.vga_emu.regs.get_general_reg(reg)
+    }
+
+    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
+        self.vga_emu.regs.set_attribute_reg(reg, v);
+    }
+
+    pub fn get_attribute_reg(&self, reg: AttributeReg) -> u8 {
+        self.vga_emu.regs.get_attribute_reg(reg)
+    }
+
+    pub fn get_video_mode(&self) -> u8 {
+        self.vga_emu.regs.get_video_mode()
+    }
+
+    pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
+        self.vga_emu.set_color_reg(reg, v)
+    }
+
+    pub fn get_color_reg(&self, reg: ColorReg) -> u8 {
+        self.vga_emu.get_color_reg(reg)
+    }
+
+    pub fn get_color_palette_256_value(&self, ix: usize) -> u32 {
+        self.vga_emu.get_color_palette_256_value(ix)
+    }
+
+    pub fn write_mem(&self, offset: usize, v_in: u8) {
+        self.vga_emu.write_mem(offset, v_in)
+    }
+
+    pub fn read_mem(&self, offset: usize) -> u8 {
+        self.vga_emu.read_mem(offset)
+    }
+
+    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
+        self.vga_emu.raw_read_mem(plane, offset)
+    }
+
+    //useful for testing, set the memory in a given plane
+    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
+        self.vga_emu.raw_write_mem(plane, offset, v)
+    }
+
+    pub fn write_mem_chunk(&self, offset: usize, v: &[u8]) {
+        self.vga_emu.write_mem_chunk(offset, v)
+    }
+
+    pub fn input_monitoring(&mut self) -> &mut InputMonitoring {
+        self.rc.input_monitoring()
+    }
+}
+
+impl VGAEmu {
+    pub fn new(builder: &VGABuilder) -> VGAEmu {
         let mem = vec![
             vec![0; PLANE_SIZE],
             vec![0; PLANE_SIZE],
@@ -272,73 +372,12 @@ impl VGA {
             ),
         }
 
-        VGA {
+        VGAEmu {
             regs,
             palette_256: RwLock::new(init_default_256_palette()),
             mem: Mutex::new(mem),
+            start_addr_override: builder.start_addr_override,
         }
-    }
-
-    fn setup(builder: &VGABuilder) -> Result<(VGA, VGAHandle), String> {
-        let vga = VGA::setup_vga(builder);
-
-        let width = get_width_regs(&vga.regs);
-        let height = get_height_regs(&vga.regs);
-
-        let backend_handle = setup_backend(width as usize, height as usize, builder)?;
-        Ok((vga, backend_handle))
-    }
-
-    pub fn start(self: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
-        #[cfg(feature = "sdl")]
-        return backend_sdl::start_sdl(self, handle, options);
-        #[cfg(feature = "web")]
-        return backend_web::start_web(self, handle, options);
-    }
-
-    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
-        self.regs.set_sc_data(reg, v);
-    }
-
-    pub fn get_sc_data(&self, reg: SCReg) -> u8 {
-        self.regs.get_sc_data(reg)
-    }
-
-    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
-        self.regs.set_gc_data(reg, v);
-    }
-
-    pub fn get_gc_data(&self, reg: GCReg) -> u8 {
-        self.regs.get_gc_data(reg)
-    }
-
-    #[cfg_attr(feature = "tracing", instrument(skip_all))]
-    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
-        self.regs.set_crt_data(reg, v);
-    }
-
-    pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
-        self.regs.get_crt_data(reg)
-    }
-
-    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
-        self.regs.set_general_reg(reg, v);
-    }
-
-    pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
-        self.regs.get_general_reg(reg)
-    }
-
-    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
-        self.regs.set_attribute_reg(reg, v);
-    }
-
-    pub fn get_attribute_reg(&self, reg: AttributeReg) -> u8 {
-        self.regs.get_attribute_reg(reg)
-    }
-
-    pub fn get_video_mode(&self) -> u8 {
-        self.regs.get_video_mode()
     }
 
     pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
@@ -420,6 +459,18 @@ impl VGA {
         }
     }
 
+    //useful for testing, inspect the memory for a given plane
+    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
+        let lock_mem = self.mem.lock().unwrap();
+        lock_mem[plane][offset]
+    }
+
+    //useful for testing, set the memory in a given plane
+    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
+        let mut lock_mem = self.mem.lock().unwrap();
+        lock_mem[plane][offset] = v;
+    }
+
     /// Shortcut for setting a chunk of memory.
     pub fn write_mem_chunk(&self, offset: usize, v: &[u8]) {
         for (i, v) in v.iter().enumerate() {
@@ -452,16 +503,16 @@ impl VGA {
         lock[plane][offset]
     }
 
-    //useful for testing, inspect the memory for a given plane
-    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
-        let lock_mem = self.mem.lock().unwrap();
-        lock_mem[plane][offset]
-    }
+    pub fn mem_offset(&self) -> usize {
+        if let Some(over) = self.start_addr_override {
+            return over;
+        }
 
-    //useful for testing, set the memory in a given plane
-    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
-        let mut lock_mem = self.mem.lock().unwrap();
-        lock_mem[plane][offset] = v;
+        let low = self.regs.get_crt_data(CRTReg::StartAdressLow) as u16;
+        let mut addr = self.regs.get_crt_data(CRTReg::StartAdressHigh) as u16;
+        addr <<= 8;
+        addr |= low;
+        addr as usize
     }
 }
 
@@ -534,7 +585,8 @@ fn set_regs_horizontal_display_end(regs: &VGARegs, width: u32) {
 }
 
 pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
-    vga.regs
+    vga.vga_emu
+        .regs
         .set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
@@ -548,5 +600,5 @@ fn set_regs_vertical_display_end(regs: &VGARegs, height: u32) {
 }
 
 pub fn set_vertical_display_end(vga: &VGA, height: u32) {
-    set_regs_vertical_display_end(&vga.regs, height);
+    set_regs_vertical_display_end(&vga.vga_emu.regs, height);
 }

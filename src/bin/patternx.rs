@@ -1,6 +1,5 @@
 //Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-48.md (LISTING 48.2)
-
-use std::sync::Arc;
+use std::{thread::sleep, time::Duration};
 
 use vga::{SCReg, set_vertical_display_end};
 use vga::{VGABuilder, util};
@@ -33,7 +32,7 @@ static PATT_TABLE: [[u8; 16]; 16] = [
 ];
 
 pub fn main() -> Result<(), String> {
-    let (vga, handle) = VGABuilder::new()
+    let mut vga = VGABuilder::new()
         .video_mode(0x13)
         .fullscreen(false)
         .build()?;
@@ -57,9 +56,10 @@ pub fn main() -> Result<(), String> {
         }
     }
 
-    let vga_m = Arc::new(vga);
-
-    let handle_ref = Arc::new(handle);
-    vga_m.start(handle_ref, Default::default())?;
-    Ok(())
+    loop {
+        if vga.draw_frame() {
+            return Ok(()); // quit
+        }
+        sleep(Duration::from_millis(14)); // target 70 fps
+    }
 }
