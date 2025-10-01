@@ -47,17 +47,17 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
         let mut y: usize = 0;
         for _ in 0..(h as usize) {
             for mem_byte in 0..((w / 8) as usize) {
-                let v1 = vga.mem[0][mem_offset + mem_byte];
-                let v2 = vga.mem[1][mem_offset + mem_byte];
-                let v3 = vga.mem[2][mem_offset + mem_byte];
-                let v4 = vga.mem[3][mem_offset + mem_byte];
+                let v0 = vga.mem[0][mem_offset + mem_byte];
+                let v1 = vga.mem[1][mem_offset + mem_byte];
+                let v2 = vga.mem[2][mem_offset + mem_byte];
+                let v3 = vga.mem[3][mem_offset + mem_byte];
 
                 for b in 0..8 {
                     let bx = (1 << b) as u8;
-                    let mut c = bit_x(v1, bx, 3);
+                    let mut c = bit_x(v0, bx, 0);
+                    c |= bit_x(v1, bx, 1);
                     c |= bit_x(v2, bx, 2);
-                    c |= bit_x(v3, bx, 1);
-                    c |= bit_x(v4, bx, 0);
+                    c |= bit_x(v3, bx, 3);
                     canvas.set_draw_color(default_color(c));
                     canvas.draw_point(Point::new(x as i32, y as i32)).unwrap();
                     x += 1;
@@ -93,23 +93,24 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32) {
 }
 
 fn default_color(v: u8) -> Color {
+    //source: https://wasteland.fandom.com/wiki/EGA_Colour_Palette
     return match v {
         0x00 => Color::RGB(0x0, 0x0, 0x0),
-        0x01 => Color::RGB(0x0, 0x0, 0x99),
-        0x02 => Color::RGB(0x0, 0x99, 0x0),
-        0x03 => Color::RGB(0x0, 0x99, 0x99),
-        0x04 => Color::RGB(0x99, 0x0, 0x0),
-        0x05 => Color::RGB(0x99, 0x0, 0x99),
-        0x06 => Color::RGB(0x99, 0x33, 0x00),
-        0x07 => Color::RGB(0x99, 0x99, 0x99),
-        0x08 => Color::RGB(0x66, 0x66, 0x66),
-        0x09 => Color::RGB(0x33, 0x33, 0xFF),
-        0x0A => Color::RGB(0x66, 0xFF, 0x33),
-        0x0B => Color::RGB(0x66, 0xFF, 0xFF),
-        0x0C => Color::RGB(0xCC, 0x33, 0x33),
-        0x0D => Color::RGB(0xFF, 0x33, 0xFF),
-        0x0E => Color::RGB(0xFF, 0xFF, 0x66),
-        0x0F => Color::RGB(0xFF, 0xFF, 0xFF),
+        0x01 => Color::RGB(0x0, 0x0, 0xA8),
+        0x02 => Color::RGB(0x0, 0xA8, 0x0),
+        0x03 => Color::RGB(0x0, 0xA8, 0xA8),
+        0x04 => Color::RGB(0xA8, 0x0, 0x0),
+        0x05 => Color::RGB(0xA8, 0x0, 0xA8),
+        0x06 => Color::RGB(0xA8, 0x54, 0x00),
+        0x07 => Color::RGB(0xA8, 0xA8, 0xA8),
+        0x08 => Color::RGB(0x54, 0x54, 0x54),
+        0x09 => Color::RGB(0x54, 0x54, 0xFE),
+        0x0A => Color::RGB(0x54, 0xFE, 0x54),
+        0x0B => Color::RGB(0x54, 0xFE, 0xFE),
+        0x0C => Color::RGB(0xFE, 0x54, 0x54),
+        0x0D => Color::RGB(0xFE, 0x54, 0xFE),
+        0x0E => Color::RGB(0xFE, 0xFE, 0x54),
+        0x0F => Color::RGB(0xFE, 0xFE, 0xFE),
         _ => panic!("wrong color index"),
     };
 }
