@@ -125,6 +125,6 @@ fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
     let mut di = offset;
     for _ in 0..8 {
         vga.write_mem(di, 0xff);
-        di += LOGICAL_SCREEN_WIDTH // - 1;
+        di += LOGICAL_SCREEN_WIDTH;
     }
 }
