@@ -1,11 +1,10 @@
 // Provides various utils for implementing something with the VGA
+use std::time::Duration;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use async_std::task::{self, JoinHandle};
-use std::future::Future;
-use std::time::Duration;
+use tokio::time::sleep;
 
 use crate::{CRTReg, GeneralReg, VGARegs};
 use crate::{GCReg, SCReg, PLANE_SIZE, VGA};
@@ -24,24 +23,6 @@ const POLL_WAIT_MICROS: u64 = 500;
 const CLEAR_DE_MASK: u8 = 0b11111110;
 const CLEAR_VR_MASK: u8 = 0b11110111;
 
-#[cfg(feature = "sdl")]
-pub fn spawn_task<F, T>(future: F) -> JoinHandle<T>
-where
-    F: Future<Output = T> + Send + 'static,
-    T: Send + 'static,
-{
-    task::spawn(future)
-}
-
-#[cfg(feature = "web")]
-pub fn spawn_task<F, T>(future: F) -> JoinHandle<T>
-where
-    F: Future<Output = T> + 'static,
-    T: 'static,
-{
-    task::spawn_local(future)
-}
-
 // wait routines
 
 #[cfg_attr(feature = "tracing", instrument(skip_all))]
@@ -51,7 +32,7 @@ pub async fn display_enable(vga: &VGA) {
         if in1 & DE_MASK == 0 {
             break;
         }
-        task::sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
+        sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
     }
 }
 
@@ -62,7 +43,7 @@ pub async fn vsync(vga: &VGA) {
         if in1 & VSYNC_MASK != 0 {
             break;
         }
-        task::sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
+        sleep(Duration::from_micros(POLL_WAIT_MICROS)).await;
     }
 }
 

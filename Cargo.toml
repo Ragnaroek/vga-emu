@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.7.2"
+version = "0.7.3"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
@@ -22,7 +22,7 @@ web = [
 tracing = ["dep:tracing"]
 
 [dependencies]
-async-std = { version = "1.13.0", features = ["unstable"] }
+tokio = { version = "1.43.0", features = ["time"] }
 # feature "sdl"
 sdl2 = { version = "0.37.0", optional = true, default-features = false, features = [
     "ttf",
