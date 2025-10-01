@@ -8,10 +8,10 @@ use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::ttf;
 
-use super::{CRTReg, GeneralReg, VGA};
+use super::{CRTReg, GeneralReg, AttributeReg, VGA};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
-const CLEAR_DE_MASK: u8 = 1;
+const CLEAR_DE_MASK: u8 = 0b11111110;
 pub const TARGET_FRAME_RATE_MICRO: u128 = 1000_000 / 60;
 pub const VERTICAL_RESET_MICRO : u64 = 635;
 
@@ -113,18 +113,21 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
         let mut y: usize = 0;
         let frame_start = Instant::now();
         
+        set_de(&vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             for _ in 0..(h as usize) {
-                //set DE to 0
-                set_de(&vga, false);
-
-                for mem_byte in 0..((w / 8) as usize) {
+                let hpan = vga.get_attribute_reg(AttributeReg::HorizontalPixelPanning) & 0xF; 
+                
+                let w_bytes = ((w / 8) as usize)+1; //+1 for "overshot" with potential hpan
+                for mem_byte in 0..w_bytes { 
                     let v0 = vga.raw_read_mem(0, mem_offset + mem_byte);
                     let v1 = vga.raw_read_mem(1, mem_offset + mem_byte);
                     let v2 = vga.raw_read_mem(2, mem_offset + mem_byte);
                     let v3 = vga.raw_read_mem(3, mem_offset + mem_byte);
 
-                    for b in 0..8 {
+                    let start = if mem_byte == 0 {hpan} else {0};
+                    let end = if mem_byte == w_bytes - 1 {hpan} else {8};
+                    for b in start..end {
                         let bx = (1 << (7 - b)) as u8;
                         let mut c = bit_x(v0, bx, 0);
                         c |= bit_x(v1, bx, 1);
@@ -142,10 +145,10 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
                 x = 0;
                 y += 1;
                 mem_offset += offset_delta * 2;
-
-                set_de(&vga, true);
             }
         })?;
+        set_de(&vga, false);
+
         canvas.clear();
         canvas.copy(&texture, None, Some(Rect::new(0, 0, w, h)))?;
         if options.show_frame_rate {
@@ -177,8 +180,6 @@ fn start_video(vga: Arc<VGA>, w: u32, h: u32, options: Options) -> Result<(), St
                 _ => {}
             }
         }
-
-        set_de(&vga, true);
         
         //simulate vertical reset
         set_vr(&vga, true);
@@ -238,12 +239,14 @@ fn set_vr(vga: &VGA, set: bool) {
 }
 
 //display enable NOT
-fn set_de(vga: &VGA, set: bool) {
+fn set_de(vga: &VGA, display_mode: bool) {
     let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
-    if set {
-        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
-    } else {
+    if display_mode {
+        //flag needs to be set to zero (NOT)
         vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
+    } else {
+        //not in display mode (vertical or horizontal retrace), set to 1
+        vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK);
     }
 }
 
