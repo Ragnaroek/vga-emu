@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+    <title>VGA m320x400 Example</title>
+  </head>
+  <body>
+    <script type="module">
+      import init, { start_m320x400_web } from "./pkg/vgam320x400.js";
+      async function run() {
+        await init();
+        start_m320x400_web();
+      }
+      run();
+    </script>
+
+  <canvas id="vga" style="border: 1px solid black;"></canvas>
+
+  <div>Press 'Return' to toggle the colours of the diamond</div>
+
+  </body>
+</html>
