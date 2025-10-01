@@ -1,11 +1,47 @@
-pub mod screen;
 pub mod util;
 pub mod input;
+#[cfg(feature = "sdl")]
+pub mod backend_sdl;
+#[cfg(feature = "web")]
+pub mod backend_web;
 
-use std::sync::atomic::{AtomicU8, AtomicU16, Ordering};
-use std::sync::RwLock;
+use std::sync::atomic::{AtomicU8, AtomicU16, Ordering, AtomicU64};
+use std::sync::{RwLock, Arc};
 
-pub const PLANE_SIZE: usize = 0xFFFF; //64KiB
+#[cfg(feature = "sdl")]
+use backend_sdl::start_sdl;
+#[cfg(feature = "web")]
+use backend_web::start_web;
+use input::InputMonitoring;
+
+pub const TARGET_FRAME_RATE_MICRO: u128 = 1_000_000 / 70;
+pub const VERTICAL_RESET_MICRO: u64 = 635;
+
+const DEBUG_HEIGHT: usize = 20;
+pub const FRAME_RATE_SAMPLES: usize = 100;
+pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
+
+#[derive(Clone)]
+pub struct Options
+ {
+    pub show_frame_rate: bool,
+    pub start_addr_override: Option<usize>,
+    pub input_monitoring: Option<InputMonitoring>,
+    /// This counter is increment on each frame
+    pub frame_count: Arc<AtomicU64>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            show_frame_rate: false,
+            //set in debug mode to ignore the start address set in the vga
+            start_addr_override: None,
+            input_monitoring: None,
+            frame_count: Arc::new(AtomicU64::new(0)),
+        }
+    }
+}
 
 pub struct VGA {
     video_mode: AtomicU8,
@@ -177,6 +213,26 @@ pub enum ColorReg {
 }
 
 impl VGA {
+    pub fn start(&self, options: Options) -> Result<(), String> {
+        #[cfg(feature = "sdl")]
+        return start_sdl(self, options);
+        #[cfg(feature = "web")]
+        return start_web(self, options);
+    }
+
+    /// Shows the full content of the VGA buffer as one big screen (for debugging) for
+    /// the planar modes. width and height depends on your virtual screen size (640x819 if
+    /// you did not change the default settings)
+    pub fn start_debug_planar_mode(&self, w: usize, h: usize, options: Options) -> Result<(), String> {
+        let mut debug_options = options;
+        debug_options.start_addr_override = Some(0);
+
+        set_horizontal_display_end(&self, w as u32);
+        set_vertical_display_end(&self, h as u32);
+
+        self.start(debug_options)
+}
+
     pub fn set_sc_data(&self, reg: SCReg, v: u8) {
         self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
     }

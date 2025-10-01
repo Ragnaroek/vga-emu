@@ -4,8 +4,7 @@
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use vgaemu::screen;
-use vgaemu::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
+use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -58,7 +57,7 @@ fn initial_panning_state() -> PanningState {
 
 
 pub fn main() {
-    let vga = vgaemu::new(0x10);
+    let vga = vga::new(0x10);
 
     draw_border(&vga, PAGE0_OFFSET);
     draw_border(&vga, PAGE1_OFFSET);
@@ -234,7 +233,7 @@ pub fn main() {
         }
     });
 
-    let options : screen::Options = vgaemu::screen::Options { show_frame_rate: true, ..Default::default() };
+    let options : vga::Options = vga::Options { show_frame_rate: true, ..Default::default() };
     /*
     enable this for debugging:
     screen::start_debug_planar_mode(
@@ -243,10 +242,10 @@ pub fn main() {
         780,
         options, 
     ).unwrap();*/
-    screen::start(vga_m, options).unwrap();
+    vga_m.start(options).unwrap();
 }
 
-fn draw_ball(vga: &vgaemu::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
+fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
     let offset = page_offset + (y * LOGICAL_SCREEN_WIDTH + x);
     let mut si = src_offset;
     let mut di = offset;
@@ -262,7 +261,7 @@ fn draw_ball(vga: &vgaemu::VGA, src_offset: usize, page_offset: usize, x: usize,
     }
 }
 
-fn draw_border(vga: &vgaemu::VGA, offset: usize) {
+fn draw_border(vga: &vga::VGA, offset: usize) {
     let mut di = offset;
     //left border
     for _ in 0..(LOGICAL_SCREEN_HEIGHT / 16) {
@@ -305,7 +304,7 @@ fn draw_border(vga: &vgaemu::VGA, offset: usize) {
     }
 }
 
-fn draw_border_block(vga: &vgaemu::VGA, offset: usize) {
+fn draw_border_block(vga: &vga::VGA, offset: usize) {
     let mut di = offset;
     for _ in 0..8 {
         vga.write_mem(di, 0xff);
@@ -353,7 +352,7 @@ fn adjust_panning(state : &mut PanningState) {
     }
 }
 
-fn wait_display_enable(vga: &Arc<vgaemu::VGA>) {
+fn wait_display_enable(vga: &Arc<vga::VGA>) {
     loop {
         let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
         if in1 & DE_MASK == 0 {
@@ -363,7 +362,7 @@ fn wait_display_enable(vga: &Arc<vgaemu::VGA>) {
     }
 }
 
-fn wait_vsync(vga: &Arc<vgaemu::VGA>) {
+fn wait_vsync(vga: &Arc<vga::VGA>) {
     loop {
         let in1 = vga.get_general_reg(GeneralReg::InputStatus1);
         if in1 & VSYNC_MASK != 0 {
