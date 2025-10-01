@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
+use sdl2::Sdl;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
@@ -11,14 +12,13 @@ use sdl2::rect::Rect;
 use sdl2::render::WindowCanvas;
 use sdl2::ttf;
 use sdl2::video::FullscreenType;
-use sdl2::Sdl;
 
-use crate::backend::{is_linear, mem_offset, render_linear, render_planar, EmuInput, PixelBuffer};
+use crate::backend::{EmuInput, PixelBuffer, is_linear, mem_offset, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
 use crate::util::{set_de, set_vr};
 use crate::{
-    CRTReg, Options, VGABuilder, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, TARGET_FRAME_RATE_MICRO,
-    VERTICAL_RESET_MICRO, VGA,
+    CRTReg, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, Options, TARGET_FRAME_RATE_MICRO,
+    VERTICAL_RESET_MICRO, VGA, VGABuilder,
 };
 
 // A non-sendable Handle to VGA that can control a limited set of things
@@ -318,10 +318,17 @@ fn to_num_code(keycode: Keycode) -> NumCode {
         Keycode::Right => return NumCode::RightArrow,
         Keycode::Insert => return NumCode::Insert,
         Keycode::Delete => return NumCode::Delete,
+        Keycode::NumLockClear => return NumCode::NumLock,
+        Keycode::ScrollLock => return NumCode::ScrollLock,
+        Keycode::PrintScreen => return NumCode::PrintScreen,
         Keycode::Home => return NumCode::Home,
         Keycode::End => return NumCode::End,
         Keycode::PageUp => return NumCode::PgUp,
         Keycode::PageDown => return NumCode::PgDn,
+        Keycode::Minus => return NumCode::Minus,
+        Keycode::Equals => return NumCode::Equals,
+        Keycode::LeftBracket => return NumCode::LeftBracket,
+        Keycode::RightBracket => return NumCode::RightBracket,
         Keycode::F1 => return NumCode::F1,
         Keycode::F2 => return NumCode::F2,
         Keycode::F3 => return NumCode::F3,

@@ -124,11 +124,7 @@ pub fn render_linear<T: PixelBuffer + ?Sized>(
 }
 
 fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
-    if v & v_ix != 0 {
-        1 << dst_ix
-    } else {
-        0
-    }
+    if v & v_ix != 0 { 1 << dst_ix } else { 0 }
 }
 
 fn default_16_color(v: u8) -> RGB {

@@ -14,7 +14,7 @@ pub use backend_web::VGAHandle;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use std::sync::atomic::{AtomicU16, AtomicU64, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, RwLockReadGuard};
 
 use input::InputMonitoring;
@@ -410,11 +410,7 @@ impl VGA {
             0x0F
         } else if mem_mode & 0x04 == 0 {
             //odd/even enabled, determine plane on odd/even address
-            if offset % 2 == 0 {
-                0x05
-            } else {
-                0x0A
-            }
+            if offset % 2 == 0 { 0x05 } else { 0x0A }
         } else {
             self.regs.get_sc_data(SCReg::MapMask)
         };

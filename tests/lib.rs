@@ -2,8 +2,8 @@ extern crate vga;
 
 use vga::util::{get_height, get_width};
 use vga::{
-    set_horizontal_display_end, set_vertical_display_end, ColorReg, GCReg, SCReg, VGABuilder,
-    PLANE_SIZE,
+    ColorReg, GCReg, PLANE_SIZE, SCReg, VGABuilder, set_horizontal_display_end,
+    set_vertical_display_end,
 };
 
 #[test]

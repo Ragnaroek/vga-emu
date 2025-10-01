@@ -2,8 +2,8 @@ use std::env;
 use std::fs;
 use std::sync::Arc;
 
-use vga::util;
 use vga::VGABuilder;
+use vga::util;
 use vga::{ColorReg, SCReg};
 
 const SCREEN_WIDTH: usize = 320;
