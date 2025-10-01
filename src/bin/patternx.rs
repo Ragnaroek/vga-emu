@@ -1,11 +1,10 @@
 //Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-48.md (LISTING 48.2)
 
-mod lib;
-
 use std::sync::Arc;
 
-use vga::screen;
-use vga::{SCReg, set_vertical_display_end};
+use vgaemu::screen;
+use vgaemu::util;
+use vgaemu::{SCReg, set_vertical_display_end};
 
 static PATT_TABLE: [[u8; 16]; 16] = [
 	[10,0,10,0,0,10,0,10,10,0,10,0,0,10,0,10],
@@ -27,7 +26,7 @@ static PATT_TABLE: [[u8; 16]; 16] = [
 ];
 
 pub fn main() {
-	let vga = vga::new(0x13);
+	let vga = vgaemu::new(0x13);
 
 	//enable Mode X
 	let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -36,13 +35,13 @@ pub fn main() {
 
 	for j in 0..4 {
 		for i in 0..4 {
-			lib::fill_pattern_x(&vga, i*80, j*60, i*80+80, j*60+60, 0, &PATT_TABLE[j*4+i]);
+			util::fill_pattern_x(&vga, i*80, j*60, i*80+80, j*60+60, 0, &PATT_TABLE[j*4+i]);
 		}
 	}
 
 	let vga_m = Arc::new(vga);
 
-	let options: screen::Options = vga::screen::Options {
+	let options: screen::Options = vgaemu::screen::Options {
 		show_frame_rate: true,
 		..Default::default()
 	};

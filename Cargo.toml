@@ -1,13 +1,33 @@
 [package]
-name = "vga"
+name = "vga-emu"
 version = "0.1.0"
 edition = "2018"
+authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [[bin]]
 name = "ball"
 path = "src/bin/ball.rs"
+
+[[bin]]
+name = "kite"
+path = "src/bin/kite.rs"
+
+[[bin]]
+name = "m320x400"
+path = "src/bin/m320x400.rs"
+
+[[bin]]
+name = "patternx"
+path = "src/bin/patternx.rs"
+
+[[bin]]
+name = "rectx"
+path = "src/bin/rectx.rs"
+
+[lib]
+name = "vgaemu"
 
 [dependencies.sdl2]
 version = "0.34.5"

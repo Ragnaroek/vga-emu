@@ -1,5 +1,5 @@
-
 pub mod screen;
+pub mod util;
 
 use std::sync::atomic::{AtomicU8, Ordering};
 
