@@ -209,7 +209,9 @@ impl VGARegs {
 }
 
 impl VGA {
-    pub fn setup(video_mode: u8, show_frame_rate: bool) -> Result<(VGA, VGAHandle), String> {
+    /// Returns a VGA that is not attached to any backend.
+    /// Can be used for unit-testing.
+    pub fn setup_no_backend(video_mode: u8) -> VGA {
         let mem = vec![
             init_atomic_u8_vec(PLANE_SIZE),
             init_atomic_u8_vec(PLANE_SIZE),
@@ -241,18 +243,21 @@ impl VGA {
             ),
         }
 
-        let width = get_width_regs(&regs);
-        let height = get_height_regs(&regs);
+        VGA {
+            regs,
+            palette_256: RwLock::new(init_default_256_palette()),
+            mem,
+        }
+    }
+
+    pub fn setup(video_mode: u8, show_frame_rate: bool) -> Result<(VGA, VGAHandle), String> {
+        let vga = VGA::setup_no_backend(video_mode);
+
+        let width = get_width_regs(&vga.regs);
+        let height = get_height_regs(&vga.regs);
 
         let backend_handle = setup_backend(width as usize, height as usize, show_frame_rate)?;
-        Ok((
-            VGA {
-                regs,
-                palette_256: RwLock::new(init_default_256_palette()),
-                mem,
-            },
-            backend_handle,
-        ))
+        Ok((vga, backend_handle))
     }
 
     pub fn start(self: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {

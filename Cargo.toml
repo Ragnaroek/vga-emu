@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
@@ -39,11 +39,6 @@ web-sys = { version = "0.3.76", optional = true, features = [
     'KeyboardEvent',
     'console',
 ] }
-
-[[test]]
-name = "integrationTestsSDL"
-path = "tests/integration_sdl.rs"
-harness = false
 
 [[bin]]
 name = "kite"
