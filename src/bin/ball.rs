@@ -1,7 +1,7 @@
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration};
+use std::time::{Duration, Instant};
 use vga::screen;
 use vga::{CRTReg, GCReg, GeneralReg, SCReg, AttributeReg};
 
@@ -30,6 +30,9 @@ const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
     BALL_3_CONTORL,
 ];
 const PANNING_CONTROL_STRING : [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
+
+const UPDATE_RATE_SAMPLES: usize = 1000;
+const POLL_WAIT_MICROS : u64 = 500;
 
 struct PanningState {
     hpan: i16,
@@ -160,6 +163,11 @@ pub fn main() {
 
         let mut panning_state = initial_panning_state();
 
+        let mut updates = Vec::with_capacity(UPDATE_RATE_SAMPLES);
+        for _ in 0..UPDATE_RATE_SAMPLES {
+            updates.push(Instant::now());
+        }
+
         loop {
             for bx in (0..NUM_BALLS).rev() {
                 draw_ball(
@@ -203,10 +211,6 @@ pub fn main() {
 
             adjust_panning(&mut panning_state);
             
-            //The animation update loop is much, much faster than the frame rate. To not waste needless cycles in the
-            //wait_vsync spinlock we sleep a while and simulate a much slower processor.
-            thread::sleep(Duration::from_micros((screen::TARGET_FRAME_RATE_MICRO - screen::TARGET_FRAME_RATE_MICRO / 100) as u64));
-            
             wait_display_enable(&vga_t);
 
             // Flip to new page by setting new start adress
@@ -230,7 +234,9 @@ pub fn main() {
 
     let mut options : screen::Options = Default::default();
     options.show_frame_rate = true;
-    /*screen::start_debug_planar_mode(
+    /*
+    enable this for debugging:
+    screen::start_debug_planar_mode(
         vga_m,
         672,
         780,
@@ -352,6 +358,7 @@ fn wait_display_enable(vga: &Arc<vga::VGA>) {
         if in1 & DE_MASK == 0 {
             break;
         }
+        thread::sleep(Duration::from_micros(POLL_WAIT_MICROS));
     }
 }
 
@@ -361,5 +368,6 @@ fn wait_vsync(vga: &Arc<vga::VGA>) {
         if in1 & VSYNC_MASK != 0 {
             break;
         }
+        thread::sleep(Duration::from_micros(POLL_WAIT_MICROS));
     }
 }
