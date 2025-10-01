@@ -56,6 +56,7 @@ impl Keyboard {
         let shifted =
             self.buttons[NumCode::LShift as usize] || self.buttons[NumCode::RShift as usize];
         let c = match (last_scan, shifted) {
+            (NumCode::Space, false) | (NumCode::Space, true) => ' ',
             (NumCode::Num0, false) | (NumCode::Num0, true) => '0',
             (NumCode::Num1, false) | (NumCode::Num1, true) => '1',
             (NumCode::Num2, false) | (NumCode::Num2, true) => '2',
