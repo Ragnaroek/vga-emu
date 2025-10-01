@@ -1,13 +1,17 @@
 use std::sync::{Arc,RwLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use std::thread::sleep;
 
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::Color;
 use sdl2::rect::Point;
 
-use super::CRTReg;
-use super::VGA;
+use super::{VGA, CRTReg, GeneralReg};
+
+const CLEAR_VR_MASK : u8 = 0b11110111;
+const CLEAR_DE_MASK : u8 = 1;
+const TARGET_FRAME_RATE_MICRO: u128 = 1000_000/60;
 
 //Shows the screen according to the VGA video mode
 pub fn start(vga: Arc<RwLock<VGA>>) {
@@ -46,7 +50,13 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
         let mut mem_offset = 0;
         let mut x: usize = 0;
         let mut y: usize = 0;
+        let frame_start = Instant::now();
+        //set VR to 0
+        set_vr(&vga_lock, false);
         for _ in 0..(h as usize) {
+            //set DE to 0
+            let h_start = Instant::now();
+            set_de(&vga_lock, false);
             for mem_byte in 0..((w / 8) as usize) {
                 let vga = vga_lock.read().unwrap();
                 let v0 = vga.mem[0][mem_offset + mem_byte];
@@ -68,6 +78,13 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
             x = 0;
             y += 1;
             mem_offset += offset_delta * 2;
+
+            set_de(&vga_lock, true);
+            let h_elapsed = h_start.elapsed().as_micros();
+            if h_elapsed < 32 {
+                //we are currently nowhere near being that fast in the simulation
+                sleep(Duration::from_micros(32 - h_elapsed as u64));
+            } 
         }
 
         for event in event_pump.poll_iter() {
@@ -82,7 +99,15 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
         }
 
         canvas.present();
-        ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 120));
+
+        set_de(&vga_lock, true);
+        set_vr(&vga_lock, true);
+        let v_elapsed = frame_start.elapsed().as_micros();
+        if v_elapsed < TARGET_FRAME_RATE_MICRO {
+            sleep(Duration::from_micros((TARGET_FRAME_RATE_MICRO -  v_elapsed) as u64));
+        } else {
+            println!("frame rate miss: {} > {}", v_elapsed, TARGET_FRAME_RATE_MICRO);
+        }
     }
 
     fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
@@ -90,6 +115,28 @@ fn start_video(vga_lock: Arc<RwLock<VGA>>, w: u32, h: u32) {
             1 << dst_ix
         } else {
             0
+        }
+    }
+
+    //vertical retrace
+    fn set_vr(vga_lock: &Arc<RwLock<VGA>>, set: bool) {
+        let mut vga = vga_lock.write().unwrap();
+        let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if set {
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_VR_MASK );
+        } else {
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_VR_MASK);
+        }
+    }
+
+    //display enable NOT
+    fn set_de(vga_lock: &Arc<RwLock<VGA>>, set: bool) {
+        let mut vga = vga_lock.write().unwrap();
+        let v0 = vga.get_general_reg(GeneralReg::InputStatus1);
+        if set {
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 | !CLEAR_DE_MASK );
+        } else {
+            vga.set_general_reg(GeneralReg::InputStatus1, v0 & CLEAR_DE_MASK);
         }
     }
 }
