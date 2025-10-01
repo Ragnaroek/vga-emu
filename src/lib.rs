@@ -3,6 +3,7 @@ pub mod screen;
 const PLANE_SIZE: usize = 0xFFFF; //64KiB
 
 pub struct VGA {
+    video_mode: u8,
     sc_reg: [u8; 5],
     gc_reg: [u8; 9],
     crt_reg: [u8; 25],
@@ -10,11 +11,15 @@ pub struct VGA {
     pub mem: [[u8; PLANE_SIZE]; 4],
 }
 
-pub fn new() -> VGA {
+pub fn new(video_mode: u8) -> VGA {
+    let mut crt_reg = [0; 25];
+    crt_reg[CRTReg::Offset as usize] = 40;
+
     VGA {
+        video_mode,
         sc_reg: [0; 5],
         gc_reg: [0; 9],
-        crt_reg: [0; 25],
+        crt_reg,
         latch_reg: [0; 4],
         mem: [[0; PLANE_SIZE]; 4],
     }
