@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::thread;
 
-use vga::{CRTReg, GCReg, SCReg};
+use vga::{CRTReg, GCReg, SCReg, VGA};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -29,8 +29,8 @@ fn new_line(
     }
 }
 
-pub fn main() {
-    let vga = vga::new(0x13);
+pub fn main() -> Result<(), String> {
+    let (vga, handle) = VGA::setup(0x13, false)?;
 
     //set 320x400 mode
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -93,7 +93,9 @@ pub fn main() {
         show_frame_rate: true,
         ..Default::default()
     };
-    vga_m.start(options).unwrap();
+    let handle_ref = Arc::new(handle);
+    vga_m.start(handle_ref, options)?;
+    Ok(())
 }
 
 fn write_pixel(vga: &vga::VGA, x: i16, y: i16, color: u8) {

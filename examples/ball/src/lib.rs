@@ -4,10 +4,9 @@
 pub mod web;
 
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-
 use std::sync::Arc;
-use vga::{CRTReg, GCReg, SCReg, AttributeReg};
-use vga::util::{display_enable, vsync, spawn_task};
+use vga::util::{display_enable, spawn_task, vsync};
+use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGA};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -30,7 +29,7 @@ const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
     BALL_2_CONTORL,
     BALL_3_CONTORL,
 ];
-const PANNING_CONTROL_STRING : [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
+const PANNING_CONTROL_STRING: [i16; 13] = [32, 1, 0, 34, 0, 1, 32, -1, 0, 34, 0, -1, 0];
 
 struct PanningState {
     hpan: i16,
@@ -49,7 +48,7 @@ struct RenderState {
     ball_y_inc: [i16; 4],
     ball_rep: [i16; 4],
     ball_control: [usize; 4],
-    
+
     current_page: usize,
     current_page_offset: usize,
 
@@ -68,23 +67,23 @@ fn initial_panning_state() -> PanningState {
 }
 
 fn initial_render_state() -> RenderState {
-    RenderState { 
+    RenderState {
         ball_x: [15, 50, 40, 70],
-        ball_y: [40, 200, 110, 300], 
-        last_ball_x: [15, 50, 40, 70], 
-        last_ball_y: [40, 200, 110, 300], 
-        ball_x_inc: [1, 1, 1, 1], 
-        ball_y_inc: [8, 8, 8, 8], 
-        ball_rep: [1, 1, 1, 1], 
-        ball_control: [0, 0, 0, 0], 
-        current_page: PAGE1, 
-        current_page_offset: PAGE1_OFFSET, 
-        panning_state: initial_panning_state(), 
+        ball_y: [40, 200, 110, 300],
+        last_ball_x: [15, 50, 40, 70],
+        last_ball_y: [40, 200, 110, 300],
+        ball_x_inc: [1, 1, 1, 1],
+        ball_y_inc: [8, 8, 8, 8],
+        ball_rep: [1, 1, 1, 1],
+        ball_control: [0, 0, 0, 0],
+        current_page: PAGE1,
+        current_page_offset: PAGE1_OFFSET,
+        panning_state: initial_panning_state(),
     }
 }
 
-pub fn start_ball() {
-    let vga = vga::new(0x10);
+pub fn start_ball() -> Result<(), String> {
+    let (vga, handle) = VGA::setup(0x10, false)?;
 
     draw_border(&vga, PAGE0_OFFSET);
     draw_border(&vga, PAGE1_OFFSET);
@@ -220,19 +219,23 @@ pub fn start_ball() {
             }
 
             adjust_panning(&mut state.panning_state);
-            
-            //web_sys::console::log_1(&format!("wait for display_enable").into()); 
-            display_enable(&vga_t).await; 
+
+            //web_sys::console::log_1(&format!("wait for display_enable").into());
+            display_enable(&vga_t).await;
 
             // Flip to new page by setting new start adress
-            let addr_parts = (state.current_page_offset + state.panning_state.panning_start_offset).to_le_bytes();
+            let addr_parts = (state.current_page_offset + state.panning_state.panning_start_offset)
+                .to_le_bytes();
             vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
             vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
 
-            vsync(&vga_t).await; 
+            vsync(&vga_t).await;
 
-            vga_t.set_attribute_reg(AttributeReg::HorizontalPixelPanning, state.panning_state.hpan as u8);
-            
+            vga_t.set_attribute_reg(
+                AttributeReg::HorizontalPixelPanning,
+                state.panning_state.hpan as u8,
+            );
+
             // Flip pages for next loop
             state.current_page ^= 1;
             if state.current_page == 0 {
@@ -243,17 +246,12 @@ pub fn start_ball() {
         }
     });
 
-    let options : vga::Options = vga::Options { show_frame_rate: true, ..Default::default() };
-    /*
-    enable this for debugging:
-    vga_m.start_debug_planar_mode(
-        vga_m,
-        672,
-        780,
-        options, 
-    ).unwrap();*/
-    vga_m.start(options).unwrap();
-
+    let options: vga::Options = vga::Options {
+        show_frame_rate: true,
+        ..Default::default()
+    };
+    let handle_ref = Arc::new(handle);
+    vga_m.start(handle_ref, options)
 }
 
 fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
@@ -323,17 +321,18 @@ fn draw_border_block(vga: &vga::VGA, offset: usize) {
     }
 }
 
-fn adjust_panning(state : &mut PanningState) {
+fn adjust_panning(state: &mut PanningState) {
     state.panning_rep -= 1;
     if state.panning_rep <= 0 {
         let ax = PANNING_CONTROL_STRING[state.panning_control];
-        if ax == 0 {//end of control string
+        if ax == 0 {
+            //end of control string
             state.panning_control = 0;
         }
         state.panning_rep = PANNING_CONTROL_STRING[state.panning_control];
-        state.panning_x_inc = PANNING_CONTROL_STRING[state.panning_control+1];
-        state.panning_y_inc = PANNING_CONTROL_STRING[state.panning_control+2];
-        state.panning_control += 3;        
+        state.panning_x_inc = PANNING_CONTROL_STRING[state.panning_control + 1];
+        state.panning_y_inc = PANNING_CONTROL_STRING[state.panning_control + 2];
+        state.panning_control += 3;
     }
 
     //horizontal pan

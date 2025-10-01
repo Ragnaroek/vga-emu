@@ -1,3 +1,4 @@
+use std::cell::{RefCell, RefMut};
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -7,20 +8,107 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
+use sdl2::render::WindowCanvas;
 use sdl2::ttf;
+use sdl2::video::FullscreenType;
+use sdl2::Sdl;
 
-use crate::backend::{is_linear, mem_offset, render_linear, render_planar, PixelBuffer};
+use crate::backend::{is_linear, mem_offset, render_linear, render_planar, EmuInput, PixelBuffer};
 use crate::input::{InputMonitoring, NumCode};
-use crate::util::{get_height, get_width, set_de, set_vr};
+use crate::util::{set_de, set_vr};
 use crate::{
     CRTReg, Options, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, TARGET_FRAME_RATE_MICRO,
     VERTICAL_RESET_MICRO, VGA,
 };
 
-pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
+// A non-sendable Handle to VGA that can control a limited set of things
+// on the main thread only.
+pub struct VGAHandle {
+    sdl_context: Sdl,
+    canvas: RefCell<WindowCanvas>,
+}
+
+impl VGAHandle {
+    pub fn set_fullscreen(&self, fullscreen: bool) {
+        if fullscreen == false {
+            let result = self
+                .canvas
+                .borrow_mut()
+                .window_mut()
+                .set_fullscreen(FullscreenType::True);
+            if result.is_err() {
+                println!("error enabling fullscreen: {:?}", result.err());
+            }
+        } else {
+            let result = self
+                .canvas
+                .borrow_mut()
+                .window_mut()
+                .set_fullscreen(FullscreenType::Off);
+            if result.is_err() {
+                println!("error disabling fullscreen: {:?}", result.err());
+            }
+        }
+    }
+
+    #[inline]
+    pub fn update_canvas<F>(&self, f: F) -> Result<(), String>
+    where
+        F: FnOnce(RefMut<'_, WindowCanvas>) -> Result<(), String>,
+    {
+        let canvas = self.canvas.borrow_mut();
+        f(canvas)
+    }
+}
+
+pub fn setup_sdl(width: usize, height: usize, show_frame_rate: bool) -> Result<VGAHandle, String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
+
+    let window = video_subsystem
+        .window(
+            "VGA",
+            width as u32,
+            if show_frame_rate {
+                height + DEBUG_HEIGHT
+            } else {
+                height
+            } as u32,
+        )
+        .position_centered()
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
+    // the logical size is important for fullscreen upscaling
+    canvas
+        .set_logical_size(width as u32, height as u32)
+        .map_err(|e| e.to_string())?;
+
+    Ok(VGAHandle {
+        sdl_context,
+        canvas: RefCell::new(canvas),
+    })
+}
+
+pub fn start_sdl(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
     let ttf_context = ttf::init().map_err(|e| e.to_string())?;
+
+    let mut event_pump = handle.sdl_context.event_pump()?;
+    let (w, h, texture_creator) = {
+        let (w, h) = handle.canvas.borrow().window().size();
+        let texture_creator = handle.canvas.borrow().texture_creator();
+        (w, h, texture_creator)
+    };
+    let mut texture = texture_creator
+        .create_texture_streaming(PixelFormatEnum::RGB24, w, h)
+        .map_err(|e| e.to_string())?;
+
+    let offset_delta = vga.regs.get_crt_data(CRTReg::Offset) as usize;
+    if offset_delta == 0 {
+        return Err(format!("illegal CRT offset: {}", offset_delta));
+    }
+
     let font;
     if options.show_frame_rate {
         font = Some(
@@ -32,6 +120,12 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
         font = None
     }
 
+    let vmode = vga.regs.get_video_mode();
+    let linear = is_linear(vmode);
+    //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
+    //but I haven't figured out how yet
+    let v_stretch = if vmode == 0x13 { 2 } else { 1 };
+
     let mut fr_buffer_vsync = [0; FRAME_RATE_SAMPLES];
     let mut fr_ix_vsync = 0;
     let mut fr_sum_vsync = 0;
@@ -42,40 +136,8 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let mut fr_sum = 0;
     let mut fr_vsync = 1;
 
-    let vmode = vga.get_video_mode();
-    let linear = is_linear(vmode);
-
-    let w = get_width(&vga) as usize;
-    let h = get_height(&vga) as usize;
-
-    //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
-    //but I haven't figured out how yet
-    let v_stretch = if vmode == 0x13 { 2 } else { 1 };
-
-    let window = video_subsystem
-        .window(
-            "VGA",
-            w as u32,
-            if options.show_frame_rate {
-                h + DEBUG_HEIGHT
-            } else {
-                h
-            } as u32,
-        )
-        .position_centered()
-        .build()
-        .map_err(|e| e.to_string())?;
-    let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
-    let mut event_pump = sdl_context.event_pump()?;
-    let texture_creator = canvas.texture_creator();
-    let mut texture = texture_creator
-        .create_texture_streaming(PixelFormatEnum::RGB24, w as u32, h as u32)
-        .map_err(|e| e.to_string())?;
-
-    let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
-    if offset_delta == 0 {
-        return Err(format!("illegal CRT offset: {}", offset_delta));
-    }
+    let mut fullscreen = false;
+    let mut emu_input = EmuInput::new();
 
     'running: loop {
         let mem_offset = mem_offset(&vga, &options);
@@ -83,14 +145,23 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
         set_de(&vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
         texture.with_lock(None, |buffer: &mut [u8], pitch: usize| {
             if linear {
-                render_linear(&vga, mem_offset, offset_delta, h, v_stretch, buffer);
+                render_linear(
+                    &vga,
+                    mem_offset,
+                    offset_delta,
+                    h as usize,
+                    v_stretch,
+                    buffer,
+                );
             } else {
-                render_planar(&vga, mem_offset, offset_delta, h, buffer, pitch);
+                render_planar(&vga, mem_offset, offset_delta, h as usize, buffer, pitch);
             }
         })?;
 
-        canvas.clear();
-        canvas.copy(&texture, None, Some(Rect::new(0, 0, w as u32, h as u32)))?;
+        handle.update_canvas(|mut canvas| {
+            canvas.clear();
+            canvas.copy(&texture, None, Some(Rect::new(0, 0, w as u32, h as u32)))
+        })?;
         if options.show_frame_rate {
             let surface = font
                 .as_ref()
@@ -101,18 +172,40 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
             let dbg_texture = texture_creator
                 .create_texture_from_surface(&surface)
                 .map_err(|e| e.to_string())?;
-            canvas.copy(
-                &dbg_texture,
-                None,
-                Some(Rect::new(0, h as i32, 200, DEBUG_HEIGHT as u32)),
-            )?;
+
+            handle.update_canvas(|mut canvas| {
+                canvas.copy(
+                    &dbg_texture,
+                    None,
+                    Some(Rect::new(0, h as i32, 200, DEBUG_HEIGHT as u32)),
+                )
+            })?;
         }
-        canvas.present();
+        handle.update_canvas(|mut canvas| {
+            canvas.present();
+            Ok(())
+        })?;
         set_de(&vga, false);
 
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => break 'running,
+                Event::KeyUp { keycode, .. } => {
+                    if keycode == Some(Keycode::LALT) {
+                        emu_input.alt = false;
+                    }
+                    if keycode == Some(Keycode::F) {
+                        emu_input.f = false;
+                    }
+                }
+                Event::KeyDown { keycode, .. } => {
+                    if keycode == Some(Keycode::LALT) {
+                        emu_input.alt = true;
+                    }
+                    if keycode == Some(Keycode::F) {
+                        emu_input.f = true;
+                    }
+                }
                 _ => {}
             }
             update_inputs(&options.input_monitoring, event);
@@ -141,9 +234,19 @@ pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
         fr_buffer_vsync[fr_ix_vsync] = v_elapsed_vsync;
         fr_sum_vsync += v_elapsed_vsync;
         fr_vsync = 1_000_000 / (fr_sum_vsync / (FRAME_RATE_SAMPLES as u128));
+
+        toggle_fullscreen(&mut emu_input, &handle, &mut fullscreen);
     }
 
     Ok(())
+}
+
+fn toggle_fullscreen(emu_input: &mut EmuInput, handle: &Arc<VGAHandle>, fullscreen: &mut bool) {
+    if emu_input.alt == true && emu_input.f == true {
+        handle.set_fullscreen(*fullscreen);
+        *fullscreen = !*fullscreen;
+        emu_input.clear_keys();
+    }
 }
 
 impl PixelBuffer for [u8] {

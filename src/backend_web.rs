@@ -1,6 +1,7 @@
 use async_std::task;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use web_sys::Document;
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::Clamped;
@@ -14,12 +15,45 @@ use crate::TARGET_FRAME_RATE_MICRO;
 use crate::VERTICAL_RESET_MICRO;
 use crate::{Options, VGA};
 
+pub struct VGAHandle {
+    document: Document,
+    render_context: web_sys::CanvasRenderingContext2d,
+}
+
 struct WebBuffer {
     data: Vec<u8>,
 }
 
-pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
+pub fn setup_web(width: usize, height: usize, _: bool) -> Result<VGAHandle, String> {
     let document = web_sys::window().unwrap().document().unwrap();
+
+    let canvas = document
+        .get_element_by_id("vga")
+        .expect("canvas element with id 'vga' not found");
+    let canvas: web_sys::HtmlCanvasElement = canvas
+        .dyn_into::<web_sys::HtmlCanvasElement>()
+        .map_err(|_| ())
+        .unwrap();
+
+    canvas.set_width(width as u32);
+    canvas.set_height(height as u32);
+
+    let ctx = canvas
+        .get_context("2d")
+        .unwrap()
+        .unwrap()
+        .dyn_into::<web_sys::CanvasRenderingContext2d>()
+        .unwrap();
+
+    Ok(VGAHandle {
+        document,
+        render_context: ctx,
+    })
+}
+
+pub fn start_web(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
+    let w = get_width(&vga);
+    let h = get_height(&vga);
 
     if let Some(ref mon) = options.input_monitoring {
         let mon_down = mon.clone();
@@ -32,45 +66,26 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
             Closure::wrap(Box::new(move |e: web_sys::Event| {
                 handle_key(true, mon_up.clone(), e)
             }));
-        document
+        handle
+            .document
             .add_event_listener_with_callback("keydown", keydown_handler.as_ref().unchecked_ref())
             .expect("add keydown event");
-        document
+        handle
+            .document
             .add_event_listener_with_callback("keyup", keyup_handler.as_ref().unchecked_ref())
             .expect("add keyup event");
         keydown_handler.forget();
         keyup_handler.forget();
     }
 
-    let canvas = document
-        .get_element_by_id("vga")
-        .expect("canvas element with id 'vga' not found");
-    let canvas: web_sys::HtmlCanvasElement = canvas
-        .dyn_into::<web_sys::HtmlCanvasElement>()
-        .map_err(|_| ())
-        .unwrap();
-
     // TODO vmode, linear, w, h, v_stretch, offset_delta => provide init function for this and remove
     // code duplication in web and sdl impl!
     let vmode = vga.get_video_mode();
     let linear = is_linear(vmode);
 
-    let w = get_width(&vga);
-    let h = get_height(&vga);
-
     //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
     //but I haven't figured out how yet
     let v_stretch = if vmode == 0x13 { 2 } else { 1 };
-
-    canvas.set_width(w);
-    canvas.set_height(h);
-
-    let ctx = canvas
-        .get_context("2d")
-        .unwrap()
-        .unwrap()
-        .dyn_into::<web_sys::CanvasRenderingContext2d>()
-        .unwrap();
 
     let offset_delta = vga.get_crt_data(CRTReg::Offset) as usize;
     if offset_delta == 0 {
@@ -80,6 +95,7 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let mut buffer = WebBuffer {
         data: vec![0; (w * h * 4) as usize],
     };
+
     spawn_local(async move {
         loop {
             let mem_offset = mem_offset(&vga, &options);
@@ -121,9 +137,11 @@ pub fn start_web(vga: Arc<VGA>, options: Options) -> Result<(), String> {
             let image_data =
                 web_sys::ImageData::new_with_u8_clamped_array(Clamped(&buffer.data), w)
                     .expect("image data");
-            ctx.put_image_data(&image_data, 0.0, 0.0)
+            handle
+                .render_context
+                .put_image_data(&image_data, 0.0, 0.0)
                 .expect("put image data");
-            ctx.begin_path();
+            handle.render_context.begin_path();
 
             set_de(&vga, false);
             task::sleep(Duration::ZERO).await;

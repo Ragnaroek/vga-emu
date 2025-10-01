@@ -3,10 +3,10 @@
 use std::sync::Arc;
 
 use vga::util;
-use vga::{set_vertical_display_end, SCReg};
+use vga::{set_vertical_display_end, SCReg, VGA};
 
-fn main() {
-    let vga = vga::new(0x13);
+fn main() -> Result<(), String> {
+    let (vga, handle) = VGA::setup(0x13, false)?;
 
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
@@ -39,5 +39,7 @@ fn main() {
         show_frame_rate: true,
         ..Default::default()
     };
-    vga_m.start(options).unwrap()
+    let handle_ref = Arc::new(handle);
+    vga_m.start(handle_ref, options)?;
+    Ok(())
 }
