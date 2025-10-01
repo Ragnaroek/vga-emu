@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.7.8"
+version = "0.7.9"
 edition = "2024"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
@@ -22,16 +22,14 @@ web = [
 tracing = ["dep:tracing"]
 
 [dependencies]
-tokio = { version = "1.43.0", features = ["rt", "time"] }
+tokio = { version = "1.46.1", features = ["rt", "time"] }
 # feature "sdl"
-sdl2 = { version = "0.37.0", optional = true, default-features = false, features = [
-    "ttf",
-] }
+sdl2 = { version = "0.38.0", optional = true, default-features = false }
 # feature "web"
-wasm-bindgen = { version = "0.2.99", optional = true }
-wasm-bindgen-futures = { version = "0.4.49", optional = true }
-js-sys = { version = "0.3.76", optional = true }
-web-sys = { version = "0.3.76", optional = true, features = [
+wasm-bindgen = { version = "0.2.100", optional = true }
+wasm-bindgen-futures = { version = "0.4.50", optional = true }
+js-sys = { version = "0.3.77", optional = true }
+web-sys = { version = "0.3.77", optional = true, features = [
     'Document',
     'Window',
     'CanvasRenderingContext2d',
