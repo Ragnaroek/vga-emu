@@ -1,4 +1,5 @@
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -9,10 +10,10 @@ use sdl2::rect::Rect;
 use sdl2::ttf;
 
 use crate::input::{InputMonitoring, Keyboard, NumCode};
-use crate::util::{get_width, get_height, set_de, set_vr, mem_offset};
-use crate::{ is_linear, CRTReg, VGA, Options, FRAME_RATE_SAMPLES, DEBUG_HEIGHT, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO, AttributeReg };
+use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar, get_width, get_height, set_de, set_vr, mem_offset};
+use crate::{ CRTReg, VGA, Options, FRAME_RATE_SAMPLES, DEBUG_HEIGHT, TARGET_FRAME_RATE_MICRO, VERTICAL_RESET_MICRO };
 
-pub fn start_sdl(vga: &VGA, options: Options) -> Result<(), String> {
+pub fn start_sdl(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let ttf_context = ttf::init().map_err(|e| e.to_string())?;
@@ -83,7 +84,6 @@ pub fn start_sdl(vga: &VGA, options: Options) -> Result<(), String> {
                 render_planar(&vga, mem_offset, offset_delta, h, buffer, pitch);
             }
         })?;
-        set_de(&vga, false);
 
         canvas.clear();
         canvas.copy(&texture, None, Some(Rect::new(0, 0, w as u32, h as u32)))?;
@@ -103,8 +103,8 @@ pub fn start_sdl(vga: &VGA, options: Options) -> Result<(), String> {
                 Some(Rect::new(0, h as i32, 200, DEBUG_HEIGHT as u32)),
             )?;
         }
-
         canvas.present();
+        set_de(&vga, false);
 
         for event in event_pump.poll_iter() {
             match event {
@@ -147,107 +147,12 @@ pub fn start_sdl(vga: &VGA, options: Options) -> Result<(), String> {
     Ok(())
 }
 
-fn render_planar(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut [u8], pitch: usize,
-) {
-    let mut x: usize = 0;
-    let mut y: usize = 0;
-    let mut mem_offset = mem_offset_p;
-    let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
-    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 2; //+1 for exclusive intervall, +1 for "overshot" with potential hpan
-
-    for _ in 0..(h / max_scan) {
-        for _ in 0..max_scan {
-            let hpan = vga.get_attribute_reg(AttributeReg::HorizontalPixelPanning) & 0xF;
-            for mem_byte in 0..w_bytes {
-                let v0 = vga.raw_read_mem(0, mem_offset + mem_byte);
-                let v1 = vga.raw_read_mem(1, mem_offset + mem_byte);
-                let v2 = vga.raw_read_mem(2, mem_offset + mem_byte);
-                let v3 = vga.raw_read_mem(3, mem_offset + mem_byte);
-
-                let start = if mem_byte == 0 { hpan } else { 0 };
-                let end = if mem_byte == w_bytes - 1 { hpan } else { 8 };
-                for b in start..end {
-                    let bx = (1 << (7 - b)) as u8;
-                    let mut pixel = bit_x(v0, bx, 0);
-                    pixel |= bit_x(v1, bx, 1);
-                    pixel |= bit_x(v2, bx, 2);
-                    pixel |= bit_x(v3, bx, 3);
-
-                    let color = default_16_color(pixel);
-                    let offset = y * pitch + x * 3;
-                    buffer[offset] = color.r;
-                    buffer[offset + 1] = color.g;
-                    buffer[offset + 2] = color.b;
-                    x += 1;
-                }
-            }
-            x = 0;
-            y += 1;
-        }
-        mem_offset += offset_delta * 2;
-    }
-}
-
-fn render_linear(
-    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize,
-    buffer: &mut [u8],
-) {
-    let mut mem_offset = mem_offset_p;
-    let max_scan = (vga.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
-    let w_bytes = vga.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 1;
-
-    let mut buffer_offset = 0;
-    for _ in 0..((h / max_scan) as usize) {
-        for _ in 0..max_scan {
-            for x_byte in 0..w_bytes {
-                for p in 0..4 {
-                    let v = vga.raw_read_mem(p, mem_offset + x_byte);
-                    let color = vga.get_color_palette_256(v as usize);
-                    for _ in 0..v_stretch {
-                        // each color part (RGB) contains the high-order 6 bit values. 
-                        // To get a "real" RGB value for display the value have to shifted
-                        // by 2 bits (otherwise the color will be dimmed)
-                        buffer[buffer_offset] = ((color & 0xFF0000) >> 14) as u8;
-                        buffer[buffer_offset + 1] = ((color & 0x00FF00) >> 6) as u8;
-                        buffer[buffer_offset + 2] = ((color & 0x0000FF) << 2) as u8;
-                        buffer_offset += 3;
-                    }
-                }
-            }
-        }
-        mem_offset += offset_delta * 2;
-    }
-}
-
-fn default_16_color(v: u8) -> Color {
-    //source: https://wasteland.fandom.com/wiki/EGA_Colour_Palette
-    match v {
-        0x00 => Color::RGB(0x0, 0x0, 0x0),
-        0x01 => Color::RGB(0x0, 0x0, 0xA8),
-        0x02 => Color::RGB(0x0, 0xA8, 0x0),
-        0x03 => Color::RGB(0x0, 0xA8, 0xA8),
-        0x04 => Color::RGB(0xA8, 0x0, 0x0),
-        0x05 => Color::RGB(0xA8, 0x0, 0xA8),
-        0x06 => Color::RGB(0xA8, 0x54, 0x00),
-        0x07 => Color::RGB(0xA8, 0xA8, 0xA8),
-        0x08 => Color::RGB(0x54, 0x54, 0x54),
-        0x09 => Color::RGB(0x54, 0x54, 0xFE),
-        0x0A => Color::RGB(0x54, 0xFE, 0x54),
-        0x0B => Color::RGB(0x54, 0xFE, 0xFE),
-        0x0C => Color::RGB(0xFE, 0x54, 0x54),
-        0x0D => Color::RGB(0xFE, 0x54, 0xFE),
-        0x0E => Color::RGB(0xFE, 0xFE, 0x54),
-        0x0F => Color::RGB(0xFE, 0xFE, 0xFE),
-        _ => panic!("wrong color index"),
-    }
-}
-
-fn bit_x(v: u8, v_ix: u8, dst_ix: u8) -> u8 {
-    if v & v_ix != 0 {
-        1 << dst_ix
-    } else {
-        0
+impl PixelBuffer for [u8] { // TODO Use dedicated SDLBuffer here instead of [u8]
+    const PIXEL_WIDTH : usize = 3;
+    fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8) {
+        self[offset] = r;
+        self[offset + 1] = g;
+        self[offset + 2] = b;
     }
 }
 
