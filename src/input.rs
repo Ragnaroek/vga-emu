@@ -16,7 +16,8 @@ impl InputMonitoring {
         }
     }
 
-    pub fn key_pressed(&self) -> bool {
+    // convenience method, returns true if any keyboard key was pressed
+    pub fn any_key_pressed(&self) -> bool {
         let kb = &mut *self.keyboard.lock().unwrap();
         for i in 0..NUM_KEYS {
             if kb.buttons[i] == true {
@@ -24,6 +25,11 @@ impl InputMonitoring {
             }
         }
         false
+    }
+
+    pub fn key_pressed(&self, key: NumCode) -> bool {
+        let kb = &mut *self.keyboard.lock().unwrap();
+        return kb.buttons[key as usize] 
     }
 }
 
