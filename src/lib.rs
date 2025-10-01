@@ -1,30 +1,47 @@
 pub mod screen;
 
+use std::sync::atomic::{AtomicU8, Ordering};
+
 const PLANE_SIZE: usize = 0xFFFF; //64KiB
 
 pub struct VGA {
-    video_mode: u8,
-    sc_reg: [u8; 5],
-    gc_reg: [u8; 9],
-    crt_reg: [u8; 25],
-    latch_reg: [u8; 4],
-    general_reg: [u8; 4],
-    pub mem: [[u8; PLANE_SIZE]; 4],
+    video_mode: AtomicU8,
+    sc_reg: Vec<AtomicU8>,
+    gc_reg: Vec<AtomicU8>,
+    crt_reg: Vec<AtomicU8>,
+    latch_reg: Vec<AtomicU8>,
+    general_reg: Vec<AtomicU8>,
+    pub mem: Vec<Vec<AtomicU8>>,
 }
 
 pub fn new(video_mode: u8) -> VGA {
-    let mut crt_reg = [0; 25];
-    crt_reg[CRTReg::Offset as usize] = 40;
+    let mut crt_reg = init_atomic_u8_vec(25);
+    crt_reg[CRTReg::Offset as usize] = AtomicU8::new(40);
+
+    let mem = vec![
+        init_atomic_u8_vec(PLANE_SIZE),
+        init_atomic_u8_vec(PLANE_SIZE),
+        init_atomic_u8_vec(PLANE_SIZE),
+        init_atomic_u8_vec(PLANE_SIZE),
+    ];
 
     VGA {
-        video_mode,
-        sc_reg: [0; 5],
-        gc_reg: [0; 9],
+        video_mode: AtomicU8::new(video_mode),
+        sc_reg: init_atomic_u8_vec(5),
+        gc_reg: init_atomic_u8_vec(9),
         crt_reg,
-        latch_reg: [0; 4],
-        general_reg: [0; 4],
-        mem: [[0; PLANE_SIZE]; 4],
+        latch_reg: init_atomic_u8_vec(4),
+        general_reg: init_atomic_u8_vec(4),
+        mem,
     }
+}
+
+fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
+    let mut vec = Vec::with_capacity(len);
+    for _ in 0..len {
+        vec.push(AtomicU8::new(0));
+    }
+    vec
 }
 
 //Sequence Controller Register
@@ -85,40 +102,44 @@ pub enum GeneralReg {
 }
 
 impl VGA {
-    pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
-        self.sc_reg[reg as usize] = v;
+    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
+        self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
     }
 
     pub fn get_sc_data(&self, reg: SCReg) -> u8 {
-        self.sc_reg[reg as usize]
+        self.sc_reg[reg as usize].load(Ordering::Acquire)
     }
 
-    pub fn set_gc_data(&mut self, reg: GCReg, v: u8) {
-        self.gc_reg[reg as usize] = v;
+    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
+        self.gc_reg[reg as usize].swap(v, Ordering::AcqRel);
     }
 
     pub fn get_gc_data(&self, reg: GCReg) -> u8 {
-        self.gc_reg[reg as usize]
+        self.gc_reg[reg as usize].load(Ordering::Acquire)
     }
 
-    pub fn set_crt_data(&mut self, reg: CRTReg, v: u8) {
-        self.crt_reg[reg as usize] = v;
+    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
+        self.crt_reg[reg as usize].swap(v, Ordering::AcqRel);
     }
 
     pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
-        self.crt_reg[reg as usize]
+        self.crt_reg[reg as usize].load(Ordering::Acquire)
     }
 
-    pub fn set_general_reg(&mut self, reg: GeneralReg, v: u8) {
-        self.general_reg[reg as usize] = v;
+    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
+        self.general_reg[reg as usize].swap(v, Ordering::AcqRel);
     }
 
     pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
-        self.general_reg[reg as usize]
+        self.general_reg[reg as usize].load(Ordering::Acquire)
+    }
+
+    pub fn get_video_mode(&self) -> u8 {
+        self.video_mode.load(Ordering::Acquire)
     }
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
-    pub fn write_mem(&mut self, offset: usize, v_in: u8) {
+    pub fn write_mem(&self, offset: usize, v_in: u8) {
         let dest = self.get_sc_data(SCReg::MapMask);
         let mut gc_mode = self.get_gc_data(GCReg::GraphicsMode);
         gc_mode &= 0x03;
@@ -126,27 +147,31 @@ impl VGA {
         for i in 0..4 {
             if (dest & (1 << i)) != 0 {
                 let v = if gc_mode == 0x01 {
-                    self.latch_reg[i]
+                    self.latch_reg[i].load(Ordering::Acquire)
                 } else {
                     v_in
                 };
-                self.mem[i][offset] = v;
+                self.mem[i][offset].swap(v, Ordering::Relaxed);
             }
         }
     }
 
-    pub fn read_mem(&mut self, offset: usize) -> u8 {
-        let select = (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize;
-        for i in 0..4 {
-            self.latch_reg[i] = self.mem[i][offset];
-        }
-        return self.latch_reg[select];
-    }
-
     /// Shortcut for setting a chunk of memory.
-    pub fn write_mem_chunk(&mut self, offset: usize, v: &Vec<u8>) {
+    pub fn write_mem_chunk(&self, offset: usize, v: &Vec<u8>) {
         for (i, v) in v.iter().enumerate() {
             self.write_mem(offset + i, *v);
         }
+    }
+
+    pub fn read_mem(&self, offset: usize) -> u8 {
+        let select = (self.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize;
+        for i in 0..4 {
+            self.latch_reg[i].swap(self.mem[i][offset].load(Ordering::Acquire), Ordering::AcqRel);
+        }
+        self.latch_reg[select].load(Ordering::Acquire)
+    }
+
+    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
+        return self.mem[plane][offset].load(Ordering::Relaxed);
     }
 }
