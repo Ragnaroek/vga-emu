@@ -31,6 +31,6 @@ path = "src/bin/rectx.rs"
 name = "vgaemu"
 
 [dependencies.sdl2]
-version = "0.34.5"
+version = "0.35.1"
 default-features = false
 features = ["ttf"]
