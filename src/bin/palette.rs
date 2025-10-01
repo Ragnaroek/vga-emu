@@ -3,7 +3,8 @@ use std::fs;
 use std::sync::Arc;
 
 use vga::util;
-use vga::{ColorReg, SCReg, VGA};
+use vga::VGABuilder;
+use vga::{ColorReg, SCReg};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 200;
@@ -11,7 +12,10 @@ const CUBE_SIZE: usize = 10;
 const PALETTE_SIZE: usize = 16;
 
 fn main() -> Result<(), String> {
-    let (vga, handle) = VGA::setup(0x13, false)?;
+    let (vga, handle) = VGABuilder::new()
+        .video_mode(0x13)
+        .fullscreen(false)
+        .build()?;
 
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);

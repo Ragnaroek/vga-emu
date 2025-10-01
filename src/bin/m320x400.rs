@@ -3,7 +3,7 @@
 use std::sync::Arc;
 use std::thread;
 
-use vga::{CRTReg, GCReg, SCReg, VGA};
+use vga::{CRTReg, GCReg, SCReg, VGABuilder};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -30,7 +30,10 @@ fn new_line(
 }
 
 pub fn main() -> Result<(), String> {
-    let (vga, handle) = VGA::setup(0x13, false)?;
+    let (vga, handle) = VGABuilder::new()
+        .video_mode(0x13)
+        .fullscreen(false)
+        .build()?;
 
     //set 320x400 mode
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);

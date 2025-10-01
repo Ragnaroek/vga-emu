@@ -17,7 +17,7 @@ use crate::backend::{is_linear, mem_offset, render_linear, render_planar, EmuInp
 use crate::input::{InputMonitoring, NumCode};
 use crate::util::{set_de, set_vr};
 use crate::{
-    CRTReg, Options, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, TARGET_FRAME_RATE_MICRO,
+    CRTReg, Options, VGABuilder, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, TARGET_FRAME_RATE_MICRO,
     VERTICAL_RESET_MICRO, VGA,
 };
 
@@ -26,6 +26,8 @@ use crate::{
 pub struct VGAHandle {
     sdl_context: Sdl,
     canvas: RefCell<WindowCanvas>,
+    width: usize,
+    height: usize,
 }
 
 impl VGAHandle {
@@ -61,24 +63,24 @@ impl VGAHandle {
     }
 }
 
-pub fn setup_sdl(width: usize, height: usize, show_frame_rate: bool) -> Result<VGAHandle, String> {
+pub fn setup_sdl(width: usize, height: usize, builder: &VGABuilder) -> Result<VGAHandle, String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
 
-    let window = video_subsystem
-        .window(
-            "VGA",
-            width as u32,
-            if show_frame_rate {
-                height + DEBUG_HEIGHT
-            } else {
-                height
-            } as u32,
-        )
-        .position_centered()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let win_heigt = if builder.show_frame_rate {
+        height + DEBUG_HEIGHT
+    } else {
+        height
+    };
+    let win_width = width;
 
+    let mut window_builder = video_subsystem.window("VGA", win_width as u32, win_heigt as u32);
+    window_builder.position_centered();
+    if builder.fullscreen {
+        window_builder.fullscreen();
+    }
+
+    let window = window_builder.build().map_err(|e| e.to_string())?;
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     // the logical size is important for fullscreen upscaling
     canvas
@@ -88,18 +90,19 @@ pub fn setup_sdl(width: usize, height: usize, show_frame_rate: bool) -> Result<V
     Ok(VGAHandle {
         sdl_context,
         canvas: RefCell::new(canvas),
+        height: win_heigt,
+        width: win_width,
     })
 }
 
 pub fn start_sdl(vga: Arc<VGA>, handle: Arc<VGAHandle>, options: Options) -> Result<(), String> {
-    let ttf_context = ttf::init().map_err(|e| e.to_string())?;
+    let w = handle.width as u32;
+    let h = handle.height as u32;
 
+    let ttf_context = ttf::init().map_err(|e| e.to_string())?;
     let mut event_pump = handle.sdl_context.event_pump()?;
-    let (w, h, texture_creator) = {
-        let (w, h) = handle.canvas.borrow().window().size();
-        let texture_creator = handle.canvas.borrow().texture_creator();
-        (w, h, texture_creator)
-    };
+    let texture_creator = handle.canvas.borrow().texture_creator();
+
     let mut texture = texture_creator
         .create_texture_streaming(PixelFormatEnum::RGB24, w, h)
         .map_err(|e| e.to_string())?;

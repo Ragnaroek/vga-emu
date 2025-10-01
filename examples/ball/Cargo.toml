@@ -26,7 +26,8 @@ web = [
 
 [dependencies]
 vga-emu = { path = "../../" }
-async-std = { version = "1.13.0", features = ["unstable"] }
+tokio = { version = "1.43.0", features = ["time"] }
+
 # feature web
 wasm-bindgen = { version = "0.2.99", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }

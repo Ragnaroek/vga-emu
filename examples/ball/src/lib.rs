@@ -5,8 +5,11 @@ pub mod web;
 
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
 use std::sync::Arc;
-use vga::util::{display_enable, spawn_task, vsync};
-use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGA};
+
+use tokio::runtime;
+
+use vga::util::{display_enable, vsync};
+use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -83,7 +86,7 @@ fn initial_render_state() -> RenderState {
 }
 
 pub fn start_ball() -> Result<(), String> {
-    let (mut vga, handle) = VGA::setup(0x10, false)?;
+    let (mut vga, handle) = VGABuilder::new().fullscreen(false).build()?;
 
     draw_border(&mut vga, PAGE0_OFFSET);
     draw_border(&mut vga, PAGE1_OFFSET);
@@ -176,7 +179,17 @@ pub fn start_ball() -> Result<(), String> {
     let vga_t = vga_m.clone();
 
     let mut state = initial_render_state();
-    spawn_task(async move {
+
+    #[cfg(feature = "web")]
+    let rt = runtime::Builder::new_current_thread()
+        .build()
+        .map_err(|e| e.to_string())?;
+    #[cfg(feature = "sdl")]
+    let rt = runtime::Runtime::new().map_err(|e| e.to_string())?;
+    let rt_ref = Arc::new(rt);
+    let rt_task = rt_ref.clone();
+
+    rt_ref.spawn_blocking(move || {
         loop {
             for bx in (0..NUM_BALLS).rev() {
                 draw_ball(
@@ -221,7 +234,10 @@ pub fn start_ball() -> Result<(), String> {
             adjust_panning(&mut state.panning_state);
 
             //web_sys::console::log_1(&format!("wait for display_enable").into());
-            display_enable(&vga_t).await;
+
+            rt_task.block_on(async {
+                display_enable(&vga_t).await;
+            });
 
             // Flip to new page by setting new start adress
             let addr_parts = (state.current_page_offset + state.panning_state.panning_start_offset)
@@ -229,7 +245,9 @@ pub fn start_ball() -> Result<(), String> {
             vga_t.set_crt_data(CRTReg::StartAdressLow, addr_parts[0]);
             vga_t.set_crt_data(CRTReg::StartAdressHigh, addr_parts[1]);
 
-            vsync(&vga_t).await;
+            rt_task.block_on(async {
+                vsync(&vga_t).await;
+            });
 
             vga_t.set_attribute_reg(
                 AttributeReg::HorizontalPixelPanning,
