@@ -9,7 +9,7 @@ build-sdl-tracing:
 	cargo build --release --features sdl,tracing
 
 build-sdl-examples:
-	cd examples/ball && make build-sdl
+	cd examples/ball && just build-sdl
 
 # integration tests with web are currently not possible, at least compile web for testing
 # test
