@@ -2,13 +2,17 @@ use std::sync::Arc;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
-use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::event::Event;
 use sdl2::pixels::{Color, PixelFormatEnum};
 use sdl2::rect::Rect;
 use sdl2::ttf;
 
-use super::{AttributeReg, CRTReg, GeneralReg, VGA, is_linear, set_horizontal_display_end, set_vertical_display_end};
+use super::{
+    is_linear, set_horizontal_display_end, set_vertical_display_end, AttributeReg, CRTReg,
+    GeneralReg, VGA,
+};
+use super::input::{InputMonitoring, NumCode, Keyboard};
 
 const CLEAR_VR_MASK: u8 = 0b11110111;
 const CLEAR_DE_MASK: u8 = 0b11111110;
@@ -18,10 +22,11 @@ pub const VERTICAL_RESET_MICRO: u64 = 635;
 const DEBUG_HEIGHT: usize = 20;
 const FRAME_RATE_SAMPLES: usize = 100;
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct Options {
     pub show_frame_rate: bool,
     pub start_addr_override: Option<usize>,
+    pub input_monitoring: Option<InputMonitoring>,
 }
 
 impl Default for Options {
@@ -30,6 +35,7 @@ impl Default for Options {
             show_frame_rate: false,
             //set in debug mode to ignore the start adress set in the vga
             start_addr_override: None,
+            input_monitoring: None,
         }
     }
 }
@@ -38,10 +44,7 @@ impl Default for Options {
 //the planar modes. width and height depends on your virtual screen size (640x819 if
 //you did not change the default settings)
 pub fn start_debug_planar_mode(
-    vga: Arc<VGA>,
-    w: usize,
-    h: usize,
-    options: Options,
+    vga: Arc<VGA>, w: usize, h: usize, options: Options,
 ) -> Result<(), String> {
     let mut debug_options = options;
     debug_options.start_addr_override = Some(0);
@@ -52,10 +55,7 @@ pub fn start_debug_planar_mode(
     start(vga, debug_options)
 }
 
-pub fn start(
-    vga: Arc<VGA>,
-    options: Options
-) -> Result<(), String> {
+pub fn start(vga: Arc<VGA>, options: Options) -> Result<(), String> {
     let sdl_context = sdl2::init()?;
     let video_subsystem = sdl_context.video()?;
     let ttf_context = ttf::init().map_err(|e| e.to_string())?;
@@ -88,11 +88,7 @@ pub fn start(
 
     //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
     //but I haven't figured out how yet
-    let v_stretch = if vmode == 0x13 {
-        2
-    } else {
-        1
-    };
+    let v_stretch = if vmode == 0x13 { 2 } else { 1 };
 
     let window = video_subsystem
         .window(
@@ -127,14 +123,7 @@ pub fn start(
             if linear {
                 render_linear(&vga, mem_offset, offset_delta, h, v_stretch, buffer);
             } else {
-                render_planar(
-                    &vga,
-                    mem_offset,
-                    offset_delta,
-                    h,
-                    buffer,
-                    pitch,
-                );
+                render_planar(&vga, mem_offset, offset_delta, h, buffer, pitch);
             }
         })?;
         set_de(&vga, false);
@@ -169,6 +158,8 @@ pub fn start(
                 } => break 'running,
                 _ => {}
             }
+
+            update_inputs(&options.input_monitoring, event);
         }
         //simulate vertical reset
         set_vr(&vga, true);
@@ -197,13 +188,107 @@ pub fn start(
     Ok(())
 }
 
+fn update_inputs(inputs: &Option<InputMonitoring>, event: Event) {
+    if let Some(mon) = inputs {
+        let state = &mut *mon.keyboard.lock().unwrap();
+        match event {
+            Event::KeyUp { keycode, .. } => clear_key(keycode, state),
+            Event::KeyDown { keycode, .. } => set_key(keycode, state),
+            _ => {} //ignore
+        }
+    }
+}
+
+fn clear_key(keycode: Option<Keycode>, state: &mut Keyboard) {
+    if let Some(code) = keycode {
+        state.buttons[to_num_code(code) as usize] = false;
+    }
+}
+
+fn set_key(keycode: Option<Keycode>, state: &mut Keyboard) {
+    if let Some(code) = keycode {
+        state.buttons[to_num_code(code) as usize] = true;
+    }
+}
+
+fn to_num_code(keycode: Keycode) -> NumCode {
+    match keycode {
+        Keycode::Backspace => return NumCode::BackSpace,
+        Keycode::Tab => return NumCode::Tab,
+        Keycode::Return => return NumCode::Return,
+        Keycode::Escape => return NumCode::Escape,
+        Keycode::Space => return NumCode::Space,
+        Keycode::LAlt => return NumCode::Alt,
+        Keycode::RAlt => return NumCode::Alt,
+        Keycode::LCtrl => return NumCode::Control,
+        Keycode::RCtrl => return NumCode::Control,
+        Keycode::CapsLock => return NumCode::CapsLock,
+        Keycode::LShift => return NumCode::LShift,
+        Keycode::RShift => return NumCode::RShift,
+        Keycode::Up => return NumCode::UpArrow,
+        Keycode::Down => return NumCode::DownArrow,
+        Keycode::Left => return NumCode::LeftArrow,
+        Keycode::Right => return NumCode::RightArrow,
+        Keycode::Insert => return NumCode::Insert,
+        Keycode::Delete => return NumCode::Delete,
+        Keycode::Home => return NumCode::Home,
+        Keycode::End => return NumCode::End,
+        Keycode::PageUp => return NumCode::PgUp,
+        Keycode::PageDown => return NumCode::PgDn,
+        Keycode::F1 => return NumCode::F1,
+        Keycode::F2 => return NumCode::F2,
+        Keycode::F3 => return NumCode::F3,
+        Keycode::F4 => return NumCode::F4,
+        Keycode::F5 => return NumCode::F5,
+        Keycode::F6 => return NumCode::F6,
+        Keycode::F7 => return NumCode::F7,
+        Keycode::F8 => return NumCode::F8,
+        Keycode::F9 => return NumCode::F9,
+        Keycode::F10 => return NumCode::F10,
+        Keycode::F11 => return NumCode::F11,
+        Keycode::F12 => return NumCode::F12,
+        Keycode::Num1 => return NumCode::Num1,
+        Keycode::Num2 => return NumCode::Num2,
+        Keycode::Num3 => return NumCode::Num3,
+        Keycode::Num4 => return NumCode::Num4,
+        Keycode::Num5 => return NumCode::Num5,
+        Keycode::Num6 => return NumCode::Num6,
+        Keycode::Num7 => return NumCode::Num7,
+        Keycode::Num8 => return NumCode::Num8,
+        Keycode::Num9 => return NumCode::Num9,
+        Keycode::Num0 => return NumCode::Num0,
+        Keycode::A => return NumCode::A,
+        Keycode::B => return NumCode::B,
+        Keycode::C => return NumCode::C,
+        Keycode::D => return NumCode::D,
+        Keycode::E => return NumCode::E,
+        Keycode::F => return NumCode::F,
+        Keycode::G => return NumCode::G,
+        Keycode::H => return NumCode::H,
+        Keycode::I => return NumCode::I,
+        Keycode::J => return NumCode::J,
+        Keycode::K => return NumCode::K,
+        Keycode::L => return NumCode::L,
+        Keycode::M => return NumCode::M,
+        Keycode::N => return NumCode::N,
+        Keycode::O => return NumCode::O,
+        Keycode::P => return NumCode::P,
+        Keycode::Q => return NumCode::Q,
+        Keycode::R => return NumCode::R,
+        Keycode::S => return NumCode::S,
+        Keycode::T => return NumCode::T,
+        Keycode::U => return NumCode::U,
+        Keycode::V => return NumCode::V,
+        Keycode::W => return NumCode::W,
+        Keycode::X => return NumCode::X,
+        Keycode::Y => return NumCode::Y,
+        Keycode::Z => return NumCode::Z,
+        _ => return NumCode::Bad,
+    }
+}
+
 fn render_planar(
-    vga: &VGA,
-    mem_offset_p: usize,
-    offset_delta: usize,
-    h: usize,
-    buffer: &mut [u8],
-    pitch: usize,
+    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut [u8], pitch: usize,
 ) {
     let mut x: usize = 0;
     let mut y: usize = 0;
@@ -245,11 +330,7 @@ fn render_planar(
 }
 
 fn render_linear(
-    vga: &VGA,
-    mem_offset_p: usize,
-    offset_delta: usize,
-    h: usize,
-    v_stretch: usize,
+    vga: &VGA, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize,
     buffer: &mut [u8],
 ) {
     let mut mem_offset = mem_offset_p;
