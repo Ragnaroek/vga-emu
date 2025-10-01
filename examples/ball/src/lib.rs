@@ -6,9 +6,7 @@ pub mod web;
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
 use std::sync::Arc;
 
-use tokio::runtime;
-
-use vga::util::{display_enable, vsync};
+use vga::util::{display_enable, tokio_runtime, vsync};
 use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
@@ -180,12 +178,7 @@ pub fn start_ball() -> Result<(), String> {
 
     let mut state = initial_render_state();
 
-    #[cfg(feature = "web")]
-    let rt = runtime::Builder::new_current_thread()
-        .build()
-        .map_err(|e| e.to_string())?;
-    #[cfg(feature = "sdl")]
-    let rt = runtime::Runtime::new().map_err(|e| e.to_string())?;
+    let rt = tokio_runtime()?;
     let rt_ref = Arc::new(rt);
     let rt_task = rt_ref.clone();
 

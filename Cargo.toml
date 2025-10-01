@@ -1,6 +1,6 @@
 [package]
 name = "vga-emu"
-version = "0.7.4"
+version = "0.7.5"
 edition = "2021"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
 description = "VGA Emulator"
