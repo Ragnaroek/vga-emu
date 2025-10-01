@@ -1,6 +1,7 @@
 //Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use std::sync::{RwLock,Arc};
+use std::sync::{Arc, RwLock};
 use std::thread;
+use std::time::Duration;
 use vga::screen;
 use vga::{CRTReg, GCReg, SCReg};
 
@@ -15,6 +16,17 @@ const BALL_HEIGHT: usize = 24; //height of ball in scan lines
 const BLANK_OFFSET: usize = PAGE1_OFFSET * 2; //start of blank image in VGA memory
 const BALL_OFFSET: usize = BLANK_OFFSET + (BALL_WIDTH * BALL_HEIGHT); //start offset of ball image in VGA memory
 const NUM_BALLS: usize = 4;
+
+const BALL_0_CONTROL: [i16; 13] = [10, 1, 4, 10, -1, 4, 10, -1, -4, 10, 1, -4, 0];
+const BALL_1_CONTORL: [i16; 13] = [12, -1, 1, 28, -1, -1, 12, 1, -1, 28, 1, 1, 0];
+const BALL_2_CONTORL: [i16; 13] = [20, 0, -1, 40, 0, 1, 20, 0, -1, 0, 0, 0, 0];
+const BALL_3_CONTORL: [i16; 13] = [8, 1, 0, 52, -1, 0, 44, 1, 0, 0, 0, 0, 0];
+const BALL_CONTROL_STRING: [[i16; 13]; 4] = [
+    BALL_0_CONTROL,
+    BALL_1_CONTORL,
+    BALL_2_CONTORL,
+    BALL_3_CONTORL,
+];
 
 pub fn main() {
     let mut vga = vga::new(0x10);
@@ -106,19 +118,53 @@ pub fn main() {
     gc_mode |= 0x01;
     vga.set_gc_data(GCReg::GraphicsMode, gc_mode);
 
-    //TODO Start animation loop here
-    //but for now just draw the ball once to check it
-    draw_ball(&mut vga, BALL_OFFSET, 15, 40);
-    draw_ball(&mut vga, BALL_OFFSET, 50, 200);
-    draw_ball(&mut vga, BALL_OFFSET, 40, 110);
-    draw_ball(&mut vga, BALL_OFFSET, 70, 300);
-
     let vga_lock = Arc::new(RwLock::new(vga));
     let vga_t = vga_lock.clone();
 
     thread::spawn(move || {
-        let mut vga = vga_t.write().unwrap();
-        draw_ball(&mut vga, BALL_OFFSET, 20, 50);
+        let mut ball_x = [15, 50, 40, 70];
+        let mut ball_y = [40, 200, 110, 300];
+        let mut last_ball_x = [15, 50, 40, 70];
+        let mut last_ball_y = [40, 200, 110, 300];
+        let mut ball_x_inc = [1, 1, 1, 1];
+        let mut ball_y_inc = [8, 8, 8, 8];
+        let mut ball_rep = [1, 1, 1, 1];
+        let mut ball_control = [0, 0, 0, 0];
+
+        loop {
+            {
+                let mut vga = vga_t.write().unwrap();
+                for bx in (0..NUM_BALLS).rev() {
+                    draw_ball(&mut vga, BLANK_OFFSET, last_ball_x[bx], last_ball_y[bx]);
+
+                    let mut ax = ball_x[bx];
+                    last_ball_x[bx] = ax;
+                    ax = ball_y[bx];
+                    last_ball_y[bx] = ax;
+
+                    ball_rep[bx] -= 1;
+                    if ball_rep[bx] == 0 {
+                        //repeat factor run out, reset it
+                        let mut bc_ptr = ball_control[bx];
+                        if BALL_CONTROL_STRING[bx][bc_ptr] == 0 {
+                            bc_ptr = 0;
+                        }
+                        ball_rep[bx] = BALL_CONTROL_STRING[bx][bc_ptr];
+                        ball_x_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 1];
+                        ball_y_inc[bx] = BALL_CONTROL_STRING[bx][bc_ptr + 2];
+
+                        ball_control[bx] = bc_ptr + 3;
+                    }
+
+                    ball_x[bx] = (ball_x[bx] as i16 + ball_x_inc[bx]) as usize;
+                    ball_y[bx] = (ball_y[bx] as i16 + ball_y_inc[bx]) as usize;
+
+                    draw_ball(&mut vga, BALL_OFFSET, ball_x[bx], ball_y[bx]);
+                }
+            }
+
+            ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 30));
+        }
     });
 
     screen::start_debug_planar_mode(vga_lock, 672, 780);
