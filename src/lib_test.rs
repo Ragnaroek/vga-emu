@@ -128,7 +128,7 @@ fn test_bit_mask() -> Result<(), String> {
 fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
     let vga = VGABuilder::new().build()?;
     set_horizontal_display_end(&vga, 640);
-    assert_eq!(get_width(&vga), 640);
+    assert_eq!(get_width(&vga.vga_emu), 640);
     Ok(())
 }
 
@@ -136,10 +136,10 @@ fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
 fn test_set_and_get_vertical_display_end() -> Result<(), String> {
     let vga = VGABuilder::new().build()?;
     set_vertical_display_end(&vga, 400);
-    assert_eq!(get_height(&vga), 400);
+    assert_eq!(get_height(&vga.vga_emu), 400);
 
     set_vertical_display_end(&vga, 1024);
-    assert_eq!(get_height(&vga), 1024);
+    assert_eq!(get_height(&vga.vga_emu), 1024);
     Ok(())
 }
 
