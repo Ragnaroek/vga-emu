@@ -14,7 +14,7 @@ use sdl2::ttf;
 use sdl2::video::FullscreenType;
 
 use crate::backend::{EmuInput, PixelBuffer, is_linear, mem_offset, render_linear, render_planar};
-use crate::input::{InputMonitoring, NumCode};
+use crate::input::{InputMonitoring, MouseButton, NumCode};
 use crate::util::{set_de, set_vr};
 use crate::{
     CRTReg, DEBUG_HEIGHT, FRAME_RATE_SAMPLES, Options, TARGET_FRAME_RATE_MICRO,
@@ -274,9 +274,21 @@ fn update_inputs(inputs: &Option<Arc<Mutex<InputMonitoring>>>, event: Event) {
         match event {
             Event::KeyUp { keycode, .. } => clear_key(keycode, im),
             Event::KeyDown { keycode, .. } => set_key(keycode, im),
+            Event::MouseButtonUp { mouse_btn, .. } => clear_mouse_button(mouse_btn, im),
+            Event::MouseButtonDown { mouse_btn, .. } => set_mouse_button(mouse_btn, im),
             _ => {} //ignore
         }
     }
+}
+
+fn clear_mouse_button(sdl_mouse_btn: sdl2::mouse::MouseButton, state: &mut InputMonitoring) {
+    let button = to_mouse_button(sdl_mouse_btn);
+    state.mouse.buttons[button as usize] = false;
+}
+
+fn set_mouse_button(sdl_mouse_btn: sdl2::mouse::MouseButton, state: &mut InputMonitoring) {
+    let button = to_mouse_button(sdl_mouse_btn);
+    state.mouse.buttons[button as usize] = true;
 }
 
 fn clear_key(keycode: Option<Keycode>, state: &mut InputMonitoring) {
@@ -378,5 +390,14 @@ fn to_num_code(keycode: Keycode) -> NumCode {
         Keycode::Y => return NumCode::Y,
         Keycode::Z => return NumCode::Z,
         _ => return NumCode::Bad,
+    }
+}
+
+fn to_mouse_button(sdl_mouse_btn: sdl2::mouse::MouseButton) -> MouseButton {
+    match sdl_mouse_btn {
+        sdl2::mouse::MouseButton::Left => MouseButton::Left,
+        sdl2::mouse::MouseButton::Right => MouseButton::Right,
+        sdl2::mouse::MouseButton::Middle => MouseButton::Middle,
+        _ => MouseButton::None,
     }
 }

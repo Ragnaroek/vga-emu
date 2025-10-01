@@ -1,4 +1,5 @@
 const NUM_KEYS: usize = 128;
+const NUM_MOUSE_BUTTONS: usize = 4;
 
 pub struct InputMonitoring {
     pub keyboard: Keyboard,
@@ -23,20 +24,33 @@ impl InputMonitoring {
     }
 
     pub fn key_pressed(&self, key: NumCode) -> bool {
-        return self.keyboard.buttons[key as usize];
+        self.keyboard.buttons[key as usize]
+    }
+
+    pub fn clear_mouse(&mut self) {
+        for i in 0..NUM_MOUSE_BUTTONS {
+            self.mouse.buttons[i] = false;
+        }
+    }
+
+    pub fn mouse_button_pressed(&self, button: MouseButton) -> bool {
+        self.mouse.buttons[button as usize]
     }
 }
 
-// TODO convert to InputMonitoring::new()
-pub fn new_input_monitoring() -> InputMonitoring {
-    let keyboard = Keyboard {
-        last_scan: NumCode::None,
-        last_ascii: '\0',
-        buttons: [false; NUM_KEYS],
-    };
-    let mouse = Mouse {};
+impl InputMonitoring {
+    pub fn new() -> InputMonitoring {
+        let keyboard = Keyboard {
+            last_scan: NumCode::None,
+            last_ascii: '\0',
+            buttons: [false; NUM_KEYS],
+        };
+        let mouse = Mouse {
+            buttons: [false; NUM_MOUSE_BUTTONS],
+        };
 
-    InputMonitoring { keyboard, mouse }
+        InputMonitoring { keyboard, mouse }
+    }
 }
 
 pub struct Keyboard {
@@ -303,13 +317,23 @@ pub fn to_numcode(v: u8) -> NumCode {
     }
 }
 
-pub struct Mouse {
-    // TODO Mouse buttons
+pub fn to_mouse_button(v: u8) -> MouseButton {
+    match v {
+        0x01 => MouseButton::Left,
+        0x02 => MouseButton::Right,
+        0x03 => MouseButton::Middle,
+        _ => MouseButton::None,
+    }
 }
 
-pub enum MouseCode {
-    Left = 0x0,
-    Right = 0x01,
-    Middle = 0x02,
-    //TODO define MouseButtons + delta?
+pub struct Mouse {
+    pub buttons: [bool; NUM_MOUSE_BUTTONS],
+}
+
+#[derive(PartialEq, Copy, Clone, Debug)]
+pub enum MouseButton {
+    None = 0x0,
+    Left = 0x1,
+    Right = 0x02,
+    Middle = 0x03,
 }

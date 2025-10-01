@@ -4,6 +4,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.7.8]
+- mouse support
+
 # [0.7.6]
 - space input support
 
