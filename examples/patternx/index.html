@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en-US">
+  <head>
+    <meta content="text/html;charset=utf-8" http-equiv="Content-Type"/>
+    <title>VGA PatternX Example</title>
+  </head>
+  <body>
+    <script type="module">
+      import init, { start_patternx_web } from "./pkg/vgapatternx.js";
+      async function run() {
+        await init();
+        start_patternx_web();
+      }
+      run();
+    </script>
+
+  <canvas id="vga" style="border: 1px solid black;"></canvas>
+  </body>
+</html>
