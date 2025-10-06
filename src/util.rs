@@ -148,30 +148,30 @@ pub fn fill_rectangle_x(
     let mut left_clip = LEFT_CLIP_PLANE_MASK[(start_x & 0x03) as usize];
     let right_clip = RIGHT_CLIP_PLANE_MASK[(end_x & 0x03) as usize];
 
-    let mut di = start_y * SCREEN_WIDTH + (start_x >> 2) + page_base;
+    let mut offset = start_y * SCREEN_WIDTH + (start_x >> 2) + page_base;
 
-    let height = end_y - start_y;
-    let width = ((end_x - 1) - (start_x & !0x03)) >> 2;
+    let pixel_height = end_y - start_y;
+    let byte_width = ((end_x - 1) - (start_x & !0x03)) >> 2;
 
-    if width == 0 {
+    if byte_width == 0 {
         left_clip = left_clip & right_clip;
     }
 
-    for _ in 0..height {
+    for _ in 0..pixel_height {
         vga.vga_emu.regs.set_sc_data(SCReg::MapMask, left_clip);
-        vga.vga_emu.write_mem(di, color);
+        vga.vga_emu.write_mem(offset, color);
 
-        if width > 0 {
+        if byte_width > 0 {
             vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 0x0F);
-            for w in 0..(width - 1) {
-                vga.vga_emu.write_mem(di + (w + 1), color);
+            for w in 0..(byte_width - 1) {
+                vga.vga_emu.write_mem(offset + (w + 1), color);
             }
 
             vga.vga_emu.regs.set_sc_data(SCReg::MapMask, right_clip);
-            vga.vga_emu.write_mem(di + width, color);
+            vga.vga_emu.write_mem(offset + byte_width, color);
         }
 
-        di += SCREEN_WIDTH;
+        offset += SCREEN_WIDTH;
     }
 }
 
@@ -191,10 +191,9 @@ pub fn copy_screen_to_screen_x(
     let left_clip = LEFT_CLIP_PLANE_MASK[(src_start_x & 0x03) as usize];
     let right_clip = RIGHT_CLIP_PLANE_MASK[(src_end_x & 0x03) as usize];
 
-    let width_bytes = src_end_x - src_start_x;
+    let width_bytes = ((src_end_x - (src_start_x & !3)) + 3) / 4;
     let src_height = src_end_y - src_start_y;
 
-    println!("w = {}, bytes={}", src_page_width, width_bytes);
     let src_next_offset = src_page_width - width_bytes;
     let dst_next_offset = dst_page_width - width_bytes;
 
@@ -206,7 +205,7 @@ pub fn copy_screen_to_screen_x(
         di += 1;
 
         vga.vga_emu.regs.set_sc_data(SCReg::MapMask, 0x0F);
-        for _ in 0..(width_bytes - 1) {
+        for _ in 0..width_bytes {
             let _ = vga.vga_emu.read_mem(si);
             vga.vga_emu.write_mem(di, 0x00);
             si += 1;
@@ -216,8 +215,8 @@ pub fn copy_screen_to_screen_x(
         vga.vga_emu.regs.set_sc_data(SCReg::MapMask, right_clip);
         let _ = vga.vga_emu.read_mem(si);
         vga.vga_emu.write_mem(di + width_bytes, 0x00);
-        si += 1;
-        di += 1;
+        //si += 1;
+        //di += 1;
 
         si += src_next_offset;
         di += dst_next_offset;

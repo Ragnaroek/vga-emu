@@ -1,18 +1,18 @@
 [package]
-name = "vga-m320x400"
+name = "vga-kite"
 version = "0.1.0"
 edition = "2024"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
-description = "VGA m320x400 Example"
+description = "VGA Kite Example"
 license = "GPL-3.0"
-repository = "https://github.com/Ragnaroek/vga-emu/examples/m320x400"
+repository = "https://github.com/Ragnaroek/vga-emu/examples/kite"
 
 [lib]
-name = "vgam320x400"
+name = "vgakite"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "m320x400"
+name = "kite"
 path = "src/main.rs"
 
 [features]

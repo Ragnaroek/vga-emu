@@ -1,8 +1,12 @@
-//Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-48.md (LISTING 48.2)
-use std::{thread::sleep, time::Duration};
+#[cfg(feature = "web")]
+pub mod web;
 
+//Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-48.md (LISTING 48.2)
 use vga::{SCReg, set_vertical_display_end};
-use vga::{VGABuilder, util};
+use vga::{
+    VGABuilder,
+    util::{fill_pattern_x, sleep},
+};
 
 static PATT_TABLE: [[u8; 16]; 16] = [
     [10, 0, 10, 0, 0, 10, 0, 10, 10, 0, 10, 0, 0, 10, 0, 10],
@@ -31,9 +35,10 @@ static PATT_TABLE: [[u8; 16]; 16] = [
     [0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 89],
 ];
 
-pub fn main() -> Result<(), String> {
+pub async fn start_patternx() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .video_mode(0x13)
+        .title("VGA PatternX Example".to_string())
         .fullscreen(false)
         .build()?;
 
@@ -44,7 +49,7 @@ pub fn main() -> Result<(), String> {
 
     for j in 0..4 {
         for i in 0..4 {
-            util::fill_pattern_x(
+            fill_pattern_x(
                 &vga,
                 i * 80,
                 j * 60,
@@ -60,6 +65,6 @@ pub fn main() -> Result<(), String> {
         if vga.draw_frame() {
             return Ok(()); // quit
         }
-        sleep(Duration::from_millis(14)); // target 70 fps
+        sleep(14).await; // target 70 fps
     }
 }

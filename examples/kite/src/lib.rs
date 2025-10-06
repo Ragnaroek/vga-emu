@@ -1,7 +1,14 @@
-//Rectangle example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-49.md (LISTING 49.5)
-use std::{thread::sleep, time::Duration};
+#[cfg(feature = "web")]
+pub mod web;
 
-use vga::{SCReg, VGABuilder, set_vertical_display_end, util};
+//Kite example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-49.md (LISTING 49.5)
+use vga::{
+    SCReg, VGABuilder, set_vertical_display_end,
+    util::{
+        copy_screen_to_screen_x, copy_system_to_screen_masked_x, fill_pattern_x, fill_rectangle_x,
+        sleep,
+    },
+};
 
 const SCREEN_WIDTH: usize = 320;
 const SCREEN_HEIGHT: usize = 240;
@@ -25,9 +32,10 @@ static SMOKE_MASK: [u8; 49] = [
     1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0,
 ];
 
-pub fn main() -> Result<(), String> {
+pub async fn start_kite() -> Result<(), String> {
     let mut vga = VGABuilder::new()
         .video_mode(0x13)
+        .title("VGA Kite Example".to_string())
         .fullscreen(false)
         .build()?;
 
@@ -37,7 +45,7 @@ pub fn main() -> Result<(), String> {
     set_vertical_display_end(&vga, 480);
 
     draw_background(&vga, BG_START_OFFSET);
-    util::copy_screen_to_screen_x(
+    copy_screen_to_screen_x(
         &vga,
         0,
         0,
@@ -50,7 +58,7 @@ pub fn main() -> Result<(), String> {
         SCREEN_WIDTH,
         SCREEN_WIDTH,
     );
-    util::copy_screen_to_screen_x(
+    copy_screen_to_screen_x(
         &vga,
         0,
         0,
@@ -65,16 +73,20 @@ pub fn main() -> Result<(), String> {
     );
 
     loop {
-        vga.draw_frame();
-        sleep(Duration::from_millis(14)); // target 70 fps
+        // TODO kite animation
+
+        if vga.draw_frame() {
+            return Ok(()); // quit
+        }
+        sleep(14).await; // target 70 fps
     }
 }
 
 fn draw_background(vga: &vga::VGA, page_start: usize) {
     //cyan background
-    util::fill_rectangle_x(vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, page_start, 11);
+    fill_rectangle_x(vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, page_start, 11);
     //brown plain
-    util::fill_pattern_x(
+    fill_pattern_x(
         vga,
         0,
         160,
@@ -84,7 +96,7 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
         &GREEN_AND_BROWN_PATTERN,
     );
     //blue water
-    util::fill_rectangle_x(
+    fill_rectangle_x(
         vga,
         0,
         SCREEN_HEIGHT - 30,
@@ -95,7 +107,7 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
     );
     //brown mountain
     for i in 0..120 {
-        util::fill_rectangle_x(
+        fill_rectangle_x(
             vga,
             SCREEN_WIDTH / 2 - 30 - i,
             51 + i,
@@ -108,7 +120,7 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
     //yellow sun
     for i in 0..=21 {
         let tmp = (20.0 * 20.0 - (i * i) as f64 + 0.5).sqrt() as usize;
-        util::fill_rectangle_x(
+        fill_rectangle_x(
             vga,
             SCREEN_WIDTH - 25 - i,
             30 - tmp,
@@ -121,7 +133,7 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
     //green trees
     for i in (10..90).step_by(15) {
         for j in 0..20 {
-            util::fill_pattern_x(
+            fill_pattern_x(
                 vga,
                 SCREEN_WIDTH / 2 + i - j / 3 - 15,
                 i + j + 51,
@@ -133,10 +145,10 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
         }
     }
     //brick house
-    util::fill_pattern_x(vga, 265, 150, 295, 170, page_start, &BRICK_PATTERN);
-    util::fill_pattern_x(vga, 265, 130, 270, 150, page_start, &BRICK_PATTERN);
+    fill_pattern_x(vga, 265, 150, 295, 170, page_start, &BRICK_PATTERN);
+    fill_pattern_x(vga, 265, 130, 270, 150, page_start, &BRICK_PATTERN);
     for i in 0..12 {
-        util::fill_pattern_x(
+        fill_pattern_x(
             vga,
             280 - i * 2,
             138 + i,
@@ -148,7 +160,7 @@ fn draw_background(vga: &vga::VGA, page_start: usize) {
     }
     //draw smoke puffs
     for i in 0..4 {
-        util::copy_system_to_screen_masked_x(
+        copy_system_to_screen_masked_x(
             vga,
             0,
             0,

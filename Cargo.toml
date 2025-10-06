@@ -48,15 +48,3 @@ web-sys = { version = "0.3.77", optional = true, features = [
 tracing = { version = "0.1.41", optional = true, default-features = false, features = [
     "attributes",
 ] }
-
-[[bin]]
-name = "kite"
-path = "src/bin/kite.rs"
-
-[[bin]]
-name = "patternx"
-path = "src/bin/patternx.rs"
-
-[[bin]]
-name = "rectx"
-path = "src/bin/rectx.rs"

@@ -442,6 +442,7 @@ impl VGAEmu {
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
     pub fn write_mem(&self, offset: usize, v_in: u8) {
         let mem_mode = self.regs.get_sc_data(SCReg::MemoryMode);
+
         let dest = if mem_mode & 0x08 != 0 {
             //if chain4 is enabled write to all planes
             0x0F

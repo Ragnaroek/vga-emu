@@ -1,18 +1,18 @@
 [package]
-name = "vga-m320x400"
+name = "vga-patternx"
 version = "0.1.0"
 edition = "2024"
 authors = ["Michael Bohn <spaceodyssey@gmx.de>"]
-description = "VGA m320x400 Example"
+description = "VGA PatternX Example"
 license = "GPL-3.0"
-repository = "https://github.com/Ragnaroek/vga-emu/examples/m320x400"
+repository = "https://github.com/Ragnaroek/vga-emu/examples/patternx"
 
 [lib]
-name = "vgam320x400"
+name = "vgapatternx"
 crate-type = ["cdylib", "rlib"]
 
 [[bin]]
-name = "m320x400"
+name = "patternx"
 path = "src/main.rs"
 
 [features]

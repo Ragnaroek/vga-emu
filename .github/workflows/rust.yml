@@ -69,7 +69,7 @@ jobs:
         run: just build-sdl
 
       - name: Build examples
-        run: just build-sdl-examples
+        run: just build-examples
 
       - name: Run tests
         run: just test
