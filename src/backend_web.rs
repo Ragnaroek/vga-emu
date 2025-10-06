@@ -2,7 +2,7 @@ use std::sync::{Arc, RwLock, RwLockWriteGuard};
 
 use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
-use web_sys::{CanvasRenderingContext2d, Document};
+use web_sys::CanvasRenderingContext2d;
 
 use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
@@ -10,10 +10,7 @@ use crate::util::{get_height, get_width, set_de};
 use crate::{CRTReg, VGABuilder, VGAEmu};
 
 pub struct RenderContext {
-    document: Document,
     ctx: CanvasRenderingContext2d,
-    fullscreen: bool,
-    simulate_vertical_reset: bool,
     input_monitoring: Arc<RwLock<InputMonitoring>>,
 }
 
@@ -22,7 +19,9 @@ struct WebBuffer {
 }
 
 impl RenderContext {
-    pub fn init(width: usize, height: usize, builder: VGABuilder) -> Result<RenderContext, String> {
+    pub fn init(
+        width: usize, height: usize, _builder: VGABuilder,
+    ) -> Result<RenderContext, String> {
         let document = web_sys::window().unwrap().document().unwrap();
 
         let canvas = document
@@ -67,10 +66,7 @@ impl RenderContext {
         keyup_handler.forget();
 
         Ok(RenderContext {
-            document,
             ctx,
-            fullscreen: builder.fullscreen,
-            simulate_vertical_reset: builder.simulate_vertical_reset,
             input_monitoring: input_monitoring,
         })
     }
