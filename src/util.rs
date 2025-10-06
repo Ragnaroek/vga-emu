@@ -73,7 +73,7 @@ pub fn set_vr(vga: &VGAEmu, set: bool) {
 /// Drawing helper
 
 pub fn fill_pattern_x(
-    vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
+    vga: &mut VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
     pattern: &[u8; 16],
 ) {
     if end_x <= start_x || end_y <= start_y {
@@ -138,7 +138,7 @@ pub fn fill_pattern_x(
 }
 
 pub fn fill_rectangle_x(
-    vga: &VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
+    vga: &mut VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
     color: u8,
 ) {
     if end_x <= start_x || end_y <= start_y {
@@ -176,7 +176,7 @@ pub fn fill_rectangle_x(
 }
 
 pub fn copy_screen_to_screen_x(
-    vga: &VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
+    vga: &mut VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
     dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize,
 ) {
@@ -225,7 +225,7 @@ pub fn copy_screen_to_screen_x(
 
 //TODO fix dst offset shifted by some pixel, why?
 pub fn copy_system_to_screen_masked_x(
-    vga: &VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
+    vga: &mut VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
     dst_start_x: usize, dst_start_y: usize, source: &[u8], dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize, mask: &[u8],
 ) {

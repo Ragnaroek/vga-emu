@@ -33,7 +33,7 @@ pub const VERTICAL_RESET_MICRO: u64 = 635;
 pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
 pub struct VGARegs {
-    sc_reg: Vec<AtomicU8>,
+    sc_reg: Vec<u8>,
     gc_reg: Vec<AtomicU8>,
     crt_reg: Vec<AtomicU8>,
     latch_reg: Vec<AtomicU8>,
@@ -148,12 +148,12 @@ pub enum ColorReg {
 }
 
 impl VGARegs {
-    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
-        self.sc_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
+        self.sc_reg[reg as usize] = v;
     }
 
     pub fn get_sc_data(&self, reg: SCReg) -> u8 {
-        self.sc_reg[reg as usize].load(Ordering::Acquire)
+        self.sc_reg[reg as usize]
     }
 
     pub fn set_gc_data(&self, reg: GCReg, v: u8) {
@@ -263,7 +263,7 @@ impl VGA {
         self.rc.draw_frame(&self.vga_emu)
     }
 
-    pub fn set_sc_data(&self, reg: SCReg, v: u8) {
+    pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
         self.vga_emu.regs.set_sc_data(reg, v);
     }
 
@@ -355,8 +355,8 @@ impl VGAEmu {
             vec![0; PLANE_SIZE],
         ];
 
-        let regs = VGARegs {
-            sc_reg: init_atomic_u8_vec(5),
+        let mut regs = VGARegs {
+            sc_reg: vec![0; 5],
             gc_reg: init_atomic_u8_vec(9),
             crt_reg: init_atomic_u8_vec(25),
             latch_reg: init_atomic_u8_vec(4),
@@ -371,8 +371,8 @@ impl VGAEmu {
         setup_defaults(&regs);
 
         match builder.video_mode {
-            0x10 => setup_mode_10(&regs),
-            0x13 => setup_mode_13(&regs),
+            0x10 => setup_mode_10(&mut regs),
+            0x13 => setup_mode_13(&mut regs),
             _ => panic!(
                 "video mode {:x}h not yet implemented",
                 regs.get_video_mode()
@@ -533,14 +533,14 @@ fn setup_defaults(regs: &VGARegs) {
     regs.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
-fn setup_mode_10(regs: &VGARegs) {
+fn setup_mode_10(regs: &mut VGARegs) {
     regs.set_sc_data(SCReg::MemoryMode, 0x04); //disable chain 4, disable odd/even
     regs.set_crt_data(CRTReg::MaximumScanLine, 0x00);
     set_regs_horizontal_display_end(regs, 640);
     set_regs_vertical_display_end(regs, 350);
 }
 
-fn setup_mode_13(regs: &VGARegs) {
+fn setup_mode_13(regs: &mut VGARegs) {
     regs.set_sc_data(SCReg::MemoryMode, 0x08); //enable chain 4, enable odd/even
     regs.set_crt_data(CRTReg::MaximumScanLine, 0x01);
     set_regs_horizontal_display_end(regs, 640);

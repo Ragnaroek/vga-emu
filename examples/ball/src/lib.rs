@@ -4,7 +4,7 @@
 pub mod web;
 
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use vga::{util::sleep, AttributeReg, CRTReg, GCReg, SCReg, VGABuilder};
+use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder, util::sleep};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -261,7 +261,7 @@ fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y:
     }
 }
 
-fn draw_border(vga: &vga::VGA, offset: usize) {
+fn draw_border(vga: &mut vga::VGA, offset: usize) {
     let mut di = offset;
     //left border
     for _ in 0..(LOGICAL_SCREEN_HEIGHT / 16) {

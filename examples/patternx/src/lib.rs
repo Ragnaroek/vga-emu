@@ -50,7 +50,7 @@ pub async fn start_patternx() -> Result<(), String> {
     for j in 0..4 {
         for i in 0..4 {
             fill_pattern_x(
-                &vga,
+                &mut vga,
                 i * 80,
                 j * 60,
                 i * 80 + 80,

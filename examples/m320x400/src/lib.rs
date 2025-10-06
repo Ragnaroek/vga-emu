@@ -77,7 +77,7 @@ pub async fn start_m320x400() -> Result<(), String> {
                 let mut x = line.start_x;
                 let mut y = line.start_y;
                 for _ in 0..line.base_len {
-                    write_pixel(&vga, x, y, b + line.color);
+                    write_pixel(&mut vga, x, y, b + line.color);
                     x += line.x_inc;
                     y += line.y_inc;
                 }
@@ -99,7 +99,7 @@ pub async fn start_m320x400() -> Result<(), String> {
     }
 }
 
-fn write_pixel(vga: &vga::VGA, x: i16, y: i16, color: u8) {
+fn write_pixel(vga: &mut vga::VGA, x: i16, y: i16, color: u8) {
     let mut offset = (SCREEN_WIDTH / 4) * y as usize;
     offset += x as usize / 4;
 

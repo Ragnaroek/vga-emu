@@ -6,7 +6,7 @@ use crate::{
 
 #[test]
 fn test_write_read_mem_mode_0() -> Result<(), String> {
-    let vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build()?;
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -31,7 +31,7 @@ fn test_write_read_mem_mode_0() -> Result<(), String> {
 
 #[test]
 fn test_write_read_mem_mode_1() -> Result<(), String> {
-    let vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build()?;
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {
@@ -79,7 +79,7 @@ fn test_write_read_chain_4() -> Result<(), String> {
 
 #[test]
 fn test_write_read_odd_even() -> Result<(), String> {
-    let vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
+    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
     vga.set_sc_data(
         SCReg::MemoryMode,
         vga.get_sc_data(SCReg::MemoryMode) & !0x08,
@@ -99,7 +99,7 @@ fn test_write_read_odd_even() -> Result<(), String> {
 
 #[test]
 fn test_bit_mask() -> Result<(), String> {
-    let vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
+    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
     vga.set_sc_data(SCReg::MapMask, 0xFF);
     vga.write_mem(666, 0xFF);
     for i in 0..4 {

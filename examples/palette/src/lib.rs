@@ -29,7 +29,7 @@ pub async fn start_palette() -> Result<(), String> {
         set_palette(&vga, &palette);
     }
 
-    util::fill_rectangle_x(&vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0);
+    util::fill_rectangle_x(&mut vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0);
 
     let palette_size = (PALETTE_SIZE * (CUBE_SIZE + 1)) - 1;
     let x_start = (SCREEN_WIDTH - palette_size) / 2;
@@ -40,7 +40,7 @@ pub async fn start_palette() -> Result<(), String> {
             let x = x_start + w * (CUBE_SIZE + 1);
             let y = y_start + h * (CUBE_SIZE + 1);
             util::fill_rectangle_x(
-                &vga,
+                &mut vga,
                 x,
                 y,
                 x + CUBE_SIZE,

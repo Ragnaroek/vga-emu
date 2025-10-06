@@ -44,9 +44,9 @@ pub async fn start_kite() -> Result<(), String> {
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
     set_vertical_display_end(&vga, 480);
 
-    draw_background(&vga, BG_START_OFFSET);
+    draw_background(&mut vga, BG_START_OFFSET);
     copy_screen_to_screen_x(
-        &vga,
+        &mut vga,
         0,
         0,
         SCREEN_WIDTH,
@@ -59,7 +59,7 @@ pub async fn start_kite() -> Result<(), String> {
         SCREEN_WIDTH,
     );
     copy_screen_to_screen_x(
-        &vga,
+        &mut vga,
         0,
         0,
         SCREEN_WIDTH,
@@ -82,7 +82,7 @@ pub async fn start_kite() -> Result<(), String> {
     }
 }
 
-fn draw_background(vga: &vga::VGA, page_start: usize) {
+fn draw_background(vga: &mut vga::VGA, page_start: usize) {
     //cyan background
     fill_rectangle_x(vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, page_start, 11);
     //brown plain

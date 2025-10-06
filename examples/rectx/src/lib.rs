@@ -20,14 +20,14 @@ pub async fn start_rectx() -> Result<(), String> {
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
     set_vertical_display_end(&vga, 480);
 
-    fill_rectangle_x(&vga, 0, 0, 320, 240, 0, 0);
+    fill_rectangle_x(&mut vga, 0, 0, 320, 240, 0, 0);
 
     let mut j = 1;
     while j < 220 {
         let mut i = 1;
         while i < 300 {
             fill_rectangle_x(
-                &vga,
+                &mut vga,
                 i,
                 j,
                 i + 20,
