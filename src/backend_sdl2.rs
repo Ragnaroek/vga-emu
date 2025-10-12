@@ -2,14 +2,12 @@ use std::sync::{RwLock, RwLockWriteGuard};
 use std::thread::sleep;
 use std::time::Duration;
 
-use sdl3::{
+use sdl2::{
     EventPump,
     event::Event,
     keyboard::Keycode,
-    pixels::PixelFormat,
+    pixels::PixelFormatEnum,
     render::{Canvas, Texture},
-    sys::pixels::SDL_PixelFormat,
-    sys::render::SDL_RendererLogicalPresentation,
     video::Window,
 };
 
@@ -30,10 +28,11 @@ pub struct RenderContext {
 
 impl RenderContext {
     pub fn init(width: usize, height: usize, builder: VGABuilder) -> Result<RenderContext, String> {
-        let sdl = sdl3::init().map_err(|e| e.to_string())?;
+        let sdl = sdl2::init().map_err(|e| e.to_string())?;
 
         let vid = sdl.video().map_err(|e| e.to_string())?;
         let event_pump = sdl.event_pump().map_err(|e| e.to_string())?;
+        println!("rc init done");
 
         let mut window_builder = vid.window(&builder.title, width as u32, height as u32);
         window_builder.position_centered();
@@ -42,23 +41,17 @@ impl RenderContext {
         }
 
         let window = window_builder.build().map_err(|e| e.to_string())?;
-        let mut canvas = window.into_canvas();
+        let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
         // the logical size is important for fullscreen upscaling
         canvas
-            .set_logical_size(
-                width as u32,
-                height as u32,
-                SDL_RendererLogicalPresentation::LETTERBOX,
-            )
+            .set_logical_size(width as u32, height as u32)
             .map_err(|e| e.to_string())?;
+
+        println!("canvas done");
 
         let texture_builder = canvas.texture_creator();
         let texture = texture_builder
-            .create_texture_streaming(
-                unsafe { PixelFormat::from_ll(SDL_PixelFormat::RGB24) },
-                width as u32,
-                height as u32,
-            )
+            .create_texture_streaming(PixelFormatEnum::RGB24, width as u32, height as u32)
             .map_err(|e| e.to_string())?;
 
         Ok(RenderContext {
@@ -173,12 +166,18 @@ impl RenderContext {
 
     pub fn set_fullscreen(&mut self, fullscreen: bool) {
         if fullscreen == false {
-            let result = self.canvas.window_mut().set_fullscreen(true);
+            let result = self
+                .canvas
+                .window_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::True);
             if result.is_err() {
                 println!("error enabling fullscreen: {:?}", result.err());
             }
         } else {
-            let result = self.canvas.window_mut().set_fullscreen(false);
+            let result = self
+                .canvas
+                .window_mut()
+                .set_fullscreen(sdl2::video::FullscreenType::Off);
             if result.is_err() {
                 println!("error disabling fullscreen: {:?}", result.err());
             }
@@ -204,12 +203,12 @@ impl RenderContext {
         }
     }
 
-    fn clear_mouse_button(&mut self, sdl_mouse_btn: sdl3::mouse::MouseButton) {
+    fn clear_mouse_button(&mut self, sdl_mouse_btn: sdl2::mouse::MouseButton) {
         let button = to_mouse_button(sdl_mouse_btn);
         self.input_monitoring().mouse.buttons[button as usize] = false;
     }
 
-    fn set_mouse_button(&mut self, sdl_mouse_btn: sdl3::mouse::MouseButton) {
+    fn set_mouse_button(&mut self, sdl_mouse_btn: sdl2::mouse::MouseButton) {
         let button = to_mouse_button(sdl_mouse_btn);
         self.input_monitoring().mouse.buttons[button as usize] = true;
     }
@@ -278,16 +277,16 @@ fn to_num_code(keycode: Keycode) -> NumCode {
         Keycode::F10 => return NumCode::F10,
         Keycode::F11 => return NumCode::F11,
         Keycode::F12 => return NumCode::F12,
-        Keycode::_1 => return NumCode::Num1,
-        Keycode::_2 => return NumCode::Num2,
-        Keycode::_3 => return NumCode::Num3,
-        Keycode::_4 => return NumCode::Num4,
-        Keycode::_5 => return NumCode::Num5,
-        Keycode::_6 => return NumCode::Num6,
-        Keycode::_7 => return NumCode::Num7,
-        Keycode::_8 => return NumCode::Num8,
-        Keycode::_9 => return NumCode::Num9,
-        Keycode::_0 => return NumCode::Num0,
+        Keycode::Num1 => return NumCode::Num1,
+        Keycode::Num2 => return NumCode::Num2,
+        Keycode::Num3 => return NumCode::Num3,
+        Keycode::Num4 => return NumCode::Num4,
+        Keycode::Num5 => return NumCode::Num5,
+        Keycode::Num6 => return NumCode::Num6,
+        Keycode::Num7 => return NumCode::Num7,
+        Keycode::Num8 => return NumCode::Num8,
+        Keycode::Num9 => return NumCode::Num9,
+        Keycode::Num0 => return NumCode::Num0,
         Keycode::A => return NumCode::A,
         Keycode::B => return NumCode::B,
         Keycode::C => return NumCode::C,
@@ -318,11 +317,11 @@ fn to_num_code(keycode: Keycode) -> NumCode {
     }
 }
 
-fn to_mouse_button(sdl_mouse_btn: sdl3::mouse::MouseButton) -> MouseButton {
+fn to_mouse_button(sdl_mouse_btn: sdl2::mouse::MouseButton) -> MouseButton {
     match sdl_mouse_btn {
-        sdl3::mouse::MouseButton::Left => MouseButton::Left,
-        sdl3::mouse::MouseButton::Right => MouseButton::Right,
-        sdl3::mouse::MouseButton::Middle => MouseButton::Middle,
+        sdl2::mouse::MouseButton::Left => MouseButton::Left,
+        sdl2::mouse::MouseButton::Right => MouseButton::Right,
+        sdl2::mouse::MouseButton::Middle => MouseButton::Middle,
         _ => MouseButton::None,
     }
 }

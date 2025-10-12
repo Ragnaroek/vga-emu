@@ -9,3 +9,6 @@ build-sdl:
 
 run-sdl:
 	cargo run --features sdl
+
+run-sdl2:
+	cargo run --features sdl2

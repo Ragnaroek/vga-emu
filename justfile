@@ -5,6 +5,9 @@ build-web:
 build-sdl:
 	cargo build --features sdl
 
+build-sdl2:
+	cargo build --features sdl2
+
 build-sdl-tracing:
 	cargo build --release --features sdl,tracing
 

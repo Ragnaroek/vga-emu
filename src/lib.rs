@@ -5,6 +5,8 @@ mod lib_test;
 pub mod backend;
 #[cfg(feature = "sdl")]
 pub mod backend_sdl;
+#[cfg(feature = "sdl2")]
+pub mod backend_sdl2;
 #[cfg(feature = "test")]
 pub mod backend_test;
 #[cfg(feature = "web")]
@@ -14,6 +16,8 @@ pub mod util;
 
 #[cfg(feature = "sdl")]
 pub use backend_sdl::RenderContext;
+#[cfg(feature = "sdl2")]
+pub use backend_sdl2::RenderContext;
 #[cfg(feature = "test")]
 pub use backend_test::RenderContext;
 #[cfg(feature = "web")]
