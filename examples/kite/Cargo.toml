@@ -26,14 +26,13 @@ web = [
 ]
 sdl = [
     "vga-emu/sdl",
-    "dep:tokio",
+]
+sdl2 = [
+    "vga-emu/sdl2",
 ]
 
 [dependencies]
 vga-emu = { path = "../../" }
-
-# feature sdl
-tokio = { version = "1.47.1", optional = true, features = ["time", "rt"] }
 
 # feature web
 wasm-bindgen = { version = "0.2.101", optional = true }

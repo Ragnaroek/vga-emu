@@ -7,5 +7,11 @@ run-web: build-web
 build-sdl:
     cargo build --features sdl
 
+build-sdl2:
+    cargo build --features sdl2
+
 run-sdl:
 	cargo run --features sdl
+
+run-sdl2:
+	cargo run --features sdl2

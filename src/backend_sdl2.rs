@@ -5,7 +5,7 @@ use std::time::Duration;
 use sdl2::{
     EventPump,
     event::Event,
-    keyboard::Keycode,
+    keyboard::{Keycode, Mod},
     pixels::PixelFormatEnum,
     render::{Canvas, Texture},
     video::Window,
@@ -32,7 +32,6 @@ impl RenderContext {
 
         let vid = sdl.video().map_err(|e| e.to_string())?;
         let event_pump = sdl.event_pump().map_err(|e| e.to_string())?;
-        println!("rc init done");
 
         let mut window_builder = vid.window(&builder.title, width as u32, height as u32);
         window_builder.position_centered();
@@ -46,8 +45,6 @@ impl RenderContext {
         canvas
             .set_logical_size(width as u32, height as u32)
             .map_err(|e| e.to_string())?;
-
-        println!("canvas done");
 
         let texture_builder = canvas.texture_creator();
         let texture = texture_builder
@@ -129,16 +126,20 @@ impl RenderContext {
         for event in self.event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => return (emu_input, true),
-                Event::KeyUp { keycode, .. } => {
-                    if keycode == Some(Keycode::LAlt) {
+                Event::KeyUp {
+                    keycode, keymod, ..
+                } => {
+                    if keymod.contains(Mod::LALTMOD) {
                         emu_input.alt = false;
                     }
                     if keycode == Some(Keycode::F) {
                         emu_input.f = false;
                     }
                 }
-                Event::KeyDown { keycode, .. } => {
-                    if keycode == Some(Keycode::LAlt) {
+                Event::KeyDown {
+                    keycode, keymod, ..
+                } => {
+                    if keymod.contains(Mod::LALTMOD) {
                         emu_input.alt = true;
                     }
                     if keycode == Some(Keycode::F) {

@@ -5,7 +5,7 @@ use std::time::Duration;
 use sdl3::{
     EventPump,
     event::Event,
-    keyboard::Keycode,
+    keyboard::{Keycode, Mod},
     pixels::PixelFormat,
     render::{Canvas, Texture},
     sys::pixels::SDL_PixelFormat,
@@ -136,16 +136,20 @@ impl RenderContext {
         for event in self.event_pump.poll_iter() {
             match event {
                 Event::Quit { .. } => return (emu_input, true),
-                Event::KeyUp { keycode, .. } => {
-                    if keycode == Some(Keycode::LAlt) {
+                Event::KeyUp {
+                    keycode, keymod, ..
+                } => {
+                    if keymod.contains(Mod::LALTMOD) {
                         emu_input.alt = false;
                     }
                     if keycode == Some(Keycode::F) {
                         emu_input.f = false;
                     }
                 }
-                Event::KeyDown { keycode, .. } => {
-                    if keycode == Some(Keycode::LAlt) {
+                Event::KeyDown {
+                    keycode, keymod, ..
+                } => {
+                    if keymod.contains(Mod::LALTMOD) {
                         emu_input.alt = true;
                     }
                     if keycode == Some(Keycode::F) {

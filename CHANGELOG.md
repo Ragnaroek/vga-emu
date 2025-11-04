@@ -4,6 +4,13 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 # [Unreleased]
 
+# [0.8.1]
+- fullscreen toggle fix
+- example cleanup
+
+# [0.8.0]
+- switch cooperative display mode
+
 # [0.7.9]
 - remove sdl/ttf support
 
