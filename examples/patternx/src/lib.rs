@@ -45,7 +45,7 @@ pub async fn start_patternx() -> Result<(), String> {
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
-    set_vertical_display_end(&vga, 480);
+    set_vertical_display_end(&mut vga, 480);
 
     for j in 0..4 {
         for i in 0..4 {

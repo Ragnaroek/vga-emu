@@ -45,7 +45,7 @@ fn get_vertical_display_end(regs: &VGARegs) -> u32 {
 }
 
 /// display enable NOT
-pub fn set_de(vga: &VGAEmu, display_mode: bool) {
+pub fn set_de(vga: &mut VGAEmu, display_mode: bool) {
     let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if display_mode {
         //flag needs to be set to zero (NOT)
@@ -59,7 +59,7 @@ pub fn set_de(vga: &VGAEmu, display_mode: bool) {
 }
 
 /// vertical retrace
-pub fn set_vr(vga: &VGAEmu, set: bool) {
+pub fn set_vr(vga: &mut VGAEmu, set: bool) {
     let v0 = vga.regs.get_general_reg(GeneralReg::InputStatus1);
     if set {
         vga.regs

@@ -179,7 +179,7 @@ pub async fn start_ball() -> Result<(), String> {
     loop {
         for bx in (0..NUM_BALLS).rev() {
             draw_ball(
-                &vga,
+                &mut vga,
                 BLANK_OFFSET,
                 state.current_page_offset,
                 state.last_ball_x[bx],
@@ -209,7 +209,7 @@ pub async fn start_ball() -> Result<(), String> {
             state.ball_y[bx] = (state.ball_y[bx] as i16 + state.ball_y_inc[bx]) as usize;
 
             draw_ball(
-                &vga,
+                &mut vga,
                 BALL_OFFSET,
                 state.current_page_offset,
                 state.ball_x[bx],
@@ -245,7 +245,7 @@ pub async fn start_ball() -> Result<(), String> {
     }
 }
 
-fn draw_ball(vga: &vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
+fn draw_ball(vga: &mut vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
     let offset = page_offset + (y * LOGICAL_SCREEN_WIDTH + x);
     let mut si = src_offset;
     let mut di = offset;

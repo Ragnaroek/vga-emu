@@ -26,7 +26,6 @@ pub use backend_web::RenderContext;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use std::sync::atomic::{AtomicU8, AtomicU16, Ordering};
 use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 use input::InputMonitoring;
@@ -38,15 +37,15 @@ pub const PLANE_SIZE: usize = 0xFFFF; // 64KiB
 
 pub struct VGARegs {
     sc_reg: Vec<u8>,
-    gc_reg: Vec<AtomicU8>,
-    crt_reg: Vec<AtomicU8>,
-    latch_reg: Vec<AtomicU8>,
-    general_reg: Vec<AtomicU8>,
-    attribute_reg: Vec<AtomicU8>,
-    color_reg: Vec<AtomicU8>,
+    gc_reg: Vec<u8>,
+    crt_reg: Vec<u8>,
+    latch_reg: Vec<u8>,
+    general_reg: Vec<u8>,
+    attribute_reg: Vec<u8>,
+    color_reg: Vec<u8>,
 
-    color_write_reads: AtomicU16,
-    video_mode: AtomicU8,
+    color_write_reads: u16,
+    video_mode: u8,
 }
 
 pub struct VGA {
@@ -160,40 +159,40 @@ impl VGARegs {
         self.sc_reg[reg as usize]
     }
 
-    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
-        self.gc_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_gc_data(&mut self, reg: GCReg, v: u8) {
+        self.gc_reg[reg as usize] = v;
     }
 
     pub fn get_gc_data(&self, reg: GCReg) -> u8 {
-        self.gc_reg[reg as usize].load(Ordering::Acquire)
+        self.gc_reg[reg as usize]
     }
 
-    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
-        self.crt_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_crt_data(&mut self, reg: CRTReg, v: u8) {
+        self.crt_reg[reg as usize] = v;
     }
 
     pub fn get_crt_data(&self, reg: CRTReg) -> u8 {
-        self.crt_reg[reg as usize].load(Ordering::Acquire)
+        self.crt_reg[reg as usize]
     }
 
-    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
-        self.general_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_general_reg(&mut self, reg: GeneralReg, v: u8) {
+        self.general_reg[reg as usize] = v;
     }
 
     pub fn get_general_reg(&self, reg: GeneralReg) -> u8 {
-        self.general_reg[reg as usize].load(Ordering::Acquire)
+        self.general_reg[reg as usize]
     }
 
-    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
-        self.attribute_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_attribute_reg(&mut self, reg: AttributeReg, v: u8) {
+        self.attribute_reg[reg as usize] = v;
     }
 
     pub fn get_attribute_reg(&self, reg: AttributeReg) -> u8 {
-        self.attribute_reg[reg as usize].load(Ordering::Acquire)
+        self.attribute_reg[reg as usize]
     }
 
     pub fn get_video_mode(&self) -> u8 {
-        self.video_mode.load(Ordering::Acquire)
+        self.video_mode
     }
 }
 
@@ -264,7 +263,7 @@ impl VGA {
     }
 
     pub fn draw_frame(&mut self) -> bool {
-        self.rc.draw_frame(&self.vga_emu)
+        self.rc.draw_frame(&mut self.vga_emu)
     }
 
     pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
@@ -275,7 +274,7 @@ impl VGA {
         self.vga_emu.regs.get_sc_data(reg)
     }
 
-    pub fn set_gc_data(&self, reg: GCReg, v: u8) {
+    pub fn set_gc_data(&mut self, reg: GCReg, v: u8) {
         self.vga_emu.regs.set_gc_data(reg, v);
     }
 
@@ -284,7 +283,7 @@ impl VGA {
     }
 
     #[cfg_attr(feature = "tracing", instrument(skip_all))]
-    pub fn set_crt_data(&self, reg: CRTReg, v: u8) {
+    pub fn set_crt_data(&mut self, reg: CRTReg, v: u8) {
         self.vga_emu.regs.set_crt_data(reg, v);
     }
 
@@ -292,7 +291,7 @@ impl VGA {
         self.vga_emu.regs.get_crt_data(reg)
     }
 
-    pub fn set_general_reg(&self, reg: GeneralReg, v: u8) {
+    pub fn set_general_reg(&mut self, reg: GeneralReg, v: u8) {
         self.vga_emu.regs.set_general_reg(reg, v);
     }
 
@@ -300,7 +299,7 @@ impl VGA {
         self.vga_emu.regs.get_general_reg(reg)
     }
 
-    pub fn set_attribute_reg(&self, reg: AttributeReg, v: u8) {
+    pub fn set_attribute_reg(&mut self, reg: AttributeReg, v: u8) {
         self.vga_emu.regs.set_attribute_reg(reg, v);
     }
 
@@ -312,11 +311,11 @@ impl VGA {
         self.vga_emu.get_video_mode()
     }
 
-    pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
+    pub fn set_color_reg(&mut self, reg: ColorReg, v: u8) {
         self.vga_emu.set_color_reg(reg, v)
     }
 
-    pub fn get_color_reg(&self, reg: ColorReg) -> u8 {
+    pub fn get_color_reg(&mut self, reg: ColorReg) -> u8 {
         self.vga_emu.get_color_reg(reg)
     }
 
@@ -328,7 +327,7 @@ impl VGA {
         self.vga_emu.write_mem(offset, v_in)
     }
 
-    pub fn read_mem(&self, offset: usize) -> u8 {
+    pub fn read_mem(&mut self, offset: usize) -> u8 {
         self.vga_emu.read_mem(offset)
     }
 
@@ -361,18 +360,18 @@ impl VGAEmu {
 
         let mut regs = VGARegs {
             sc_reg: vec![0; 5],
-            gc_reg: init_atomic_u8_vec(9),
-            crt_reg: init_atomic_u8_vec(25),
-            latch_reg: init_atomic_u8_vec(4),
-            general_reg: init_atomic_u8_vec(4),
-            attribute_reg: init_atomic_u8_vec(21),
+            gc_reg: vec![0; 9],
+            crt_reg: vec![0; 25],
+            latch_reg: vec![0; 4],
+            general_reg: vec![0; 4],
+            attribute_reg: vec![0; 21],
 
-            video_mode: AtomicU8::new(builder.video_mode),
-            color_write_reads: AtomicU16::new(0),
-            color_reg: init_atomic_u8_vec(4),
+            video_mode: builder.video_mode,
+            color_write_reads: 0,
+            color_reg: vec![0; 4],
         };
 
-        setup_defaults(&regs);
+        setup_defaults(&mut regs);
 
         match builder.video_mode {
             0x10 => setup_mode_10(&mut regs),
@@ -391,10 +390,11 @@ impl VGAEmu {
         }
     }
 
-    pub fn set_color_reg(&self, reg: ColorReg, v: u8) {
-        self.regs.color_reg[reg as usize].swap(v, Ordering::AcqRel);
+    pub fn set_color_reg(&mut self, reg: ColorReg, v: u8) {
+        self.regs.color_reg[reg as usize] = v;
         if reg == ColorReg::Data {
-            let writes = self.regs.color_write_reads.fetch_add(1, Ordering::AcqRel);
+            let writes = self.regs.color_write_reads;
+            self.regs.color_write_reads += 1;
             let ix = self.get_color_reg(ColorReg::AddressWriteMode) as usize;
             let color_part_shift = (2 - writes) * 8;
 
@@ -403,29 +403,30 @@ impl VGAEmu {
             table[ix] |= ((v & 0x3F) as u32) << color_part_shift;
 
             if writes == 2 {
-                self.regs.color_reg[ColorReg::AddressWriteMode as usize]
-                    .fetch_add(1, Ordering::AcqRel);
-                self.regs.color_write_reads.store(0, Ordering::Relaxed);
+                self.regs.color_reg[ColorReg::AddressWriteMode as usize] =
+                    self.regs.color_reg[ColorReg::AddressWriteMode as usize].wrapping_add(1);
+                self.regs.color_write_reads = 0;
             }
         }
     }
 
-    pub fn get_color_reg(&self, reg: ColorReg) -> u8 {
+    pub fn get_color_reg(&mut self, reg: ColorReg) -> u8 {
         if reg == ColorReg::Data {
-            let reads = self.regs.color_write_reads.fetch_add(1, Ordering::AcqRel);
+            let reads = self.regs.color_write_reads;
+            self.regs.color_write_reads += 1;
             let ix = self.get_color_reg(ColorReg::AddressReadMode) as usize;
             let color_part_shift = (2 - reads) * 8;
             let color = self.get_color_palette_256_value(ix);
             let word = color & (0xFF as u32) << color_part_shift;
 
             if reads == 2 {
-                self.regs.color_reg[ColorReg::AddressReadMode as usize]
-                    .fetch_add(1, Ordering::AcqRel);
-                self.regs.color_write_reads.store(0, Ordering::Relaxed);
+                self.regs.color_reg[ColorReg::AddressReadMode as usize] =
+                    self.regs.color_reg[ColorReg::AddressReadMode as usize].wrapping_add(1);
+                self.regs.color_write_reads = 0;
             }
             (word >> color_part_shift) as u8
         } else {
-            self.regs.color_reg[reg as usize].load(Ordering::Acquire)
+            self.regs.color_reg[reg as usize]
         }
     }
 
@@ -465,9 +466,9 @@ impl VGAEmu {
         for i in 0..4 {
             if (dest & (1 << i)) != 0 {
                 let v = if gc_mode == 0x01 {
-                    self.regs.latch_reg[i].load(Ordering::Acquire)
+                    self.regs.latch_reg[i]
                 } else {
-                    let v_latch = self.regs.latch_reg[i].load(Ordering::Acquire);
+                    let v_latch = self.regs.latch_reg[i];
                     v_in & bit_mask | (v_latch & !bit_mask)
                 };
                 mem_lock[i][offset] = v;
@@ -494,7 +495,7 @@ impl VGAEmu {
         }
     }
 
-    pub fn read_mem(&self, offset: usize) -> u8 {
+    pub fn read_mem(&mut self, offset: usize) -> u8 {
         let mem_mode = self.regs.get_sc_data(SCReg::MemoryMode);
         let select = if mem_mode & 0x08 != 0 {
             //if chain4 is enabled, read from the plan determined by the offsets lower 2 bits
@@ -504,9 +505,9 @@ impl VGAEmu {
         };
         let lock_mem = self.mem.lock().unwrap();
         for i in 0..4 {
-            self.regs.latch_reg[i].swap(lock_mem[i][offset], Ordering::AcqRel);
+            self.regs.latch_reg[i] = lock_mem[i][offset];
         }
-        self.regs.latch_reg[select].load(Ordering::Acquire)
+        self.regs.latch_reg[select]
     }
 
     pub fn mem_lock(&self) -> MutexGuard<'_, Vec<Vec<u8>>> {
@@ -532,7 +533,7 @@ impl VGAEmu {
     }
 }
 
-fn setup_defaults(regs: &VGARegs) {
+fn setup_defaults(regs: &mut VGARegs) {
     regs.set_crt_data(CRTReg::Offset, 40);
     regs.set_gc_data(GCReg::BitMask, 0xFF);
 }
@@ -549,14 +550,6 @@ fn setup_mode_13(regs: &mut VGARegs) {
     regs.set_crt_data(CRTReg::MaximumScanLine, 0x01);
     set_regs_horizontal_display_end(regs, 640);
     set_regs_vertical_display_end(regs, 400);
-}
-
-fn init_atomic_u8_vec(len: usize) -> Vec<AtomicU8> {
-    let mut vec = Vec::with_capacity(len);
-    for _ in 0..len {
-        vec.push(AtomicU8::new(0));
-    }
-    vec
 }
 
 fn init_default_256_palette() -> [u32; 256] {
@@ -596,17 +589,17 @@ fn init_default_256_palette() -> [u32; 256] {
 
 //convenience functions
 
-fn set_regs_horizontal_display_end(regs: &VGARegs, width: u32) {
+fn set_regs_horizontal_display_end(regs: &mut VGARegs, width: u32) {
     regs.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
-pub fn set_horizontal_display_end(vga: &VGA, width: u32) {
+pub fn set_horizontal_display_end(vga: &mut VGA, width: u32) {
     vga.vga_emu
         .regs
         .set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
-fn set_regs_vertical_display_end(regs: &VGARegs, height: u32) {
+fn set_regs_vertical_display_end(regs: &mut VGARegs, height: u32) {
     let h = height - 1;
     regs.set_crt_data(CRTReg::VerticalDisplayEnd, h as u8);
     let bit_8 = ((h & 0x100) >> 8) as u8;
@@ -615,6 +608,6 @@ fn set_regs_vertical_display_end(regs: &VGARegs, height: u32) {
     regs.set_crt_data(CRTReg::Overflow, overflow);
 }
 
-pub fn set_vertical_display_end(vga: &VGA, height: u32) {
-    set_regs_vertical_display_end(&vga.vga_emu.regs, height);
+pub fn set_vertical_display_end(vga: &mut VGA, height: u32) {
+    set_regs_vertical_display_end(&mut vga.vga_emu.regs, height);
 }

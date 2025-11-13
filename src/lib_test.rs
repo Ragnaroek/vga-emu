@@ -53,7 +53,7 @@ fn test_write_read_mem_mode_1() -> Result<(), String> {
 
 #[test]
 fn test_write_read_chain_4() -> Result<(), String> {
-    let vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
+    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
     for i in 0..PLANE_SIZE {
         vga.write_mem(i, i as u8);
         for p in 0..4 {
@@ -126,26 +126,26 @@ fn test_bit_mask() -> Result<(), String> {
 
 #[test]
 fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
-    let vga = VGABuilder::new().build()?;
-    set_horizontal_display_end(&vga, 640);
+    let mut vga = VGABuilder::new().build()?;
+    set_horizontal_display_end(&mut vga, 640);
     assert_eq!(get_width(&vga.vga_emu), 640);
     Ok(())
 }
 
 #[test]
 fn test_set_and_get_vertical_display_end() -> Result<(), String> {
-    let vga = VGABuilder::new().build()?;
-    set_vertical_display_end(&vga, 400);
+    let mut vga = VGABuilder::new().build()?;
+    set_vertical_display_end(&mut vga, 400);
     assert_eq!(get_height(&vga.vga_emu), 400);
 
-    set_vertical_display_end(&vga, 1024);
+    set_vertical_display_end(&mut vga, 1024);
     assert_eq!(get_height(&vga.vga_emu), 1024);
     Ok(())
 }
 
 #[test]
 fn test_set_color() -> Result<(), String> {
-    let vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build()?;
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
 
     for i in 0..3 {

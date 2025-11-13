@@ -19,6 +19,8 @@ build-examples:
 	cd examples/rectx && just build-sdl && just build-sdl2 && just build-web
 	cd examples/kite && just build-sdl && just build-sdl2 && just build-web
 
+build-all: build-sdl build-sdl2 build-web build-examples
+
 test:
     cargo test --features test
 

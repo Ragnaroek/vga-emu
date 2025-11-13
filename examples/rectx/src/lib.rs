@@ -18,7 +18,7 @@ pub async fn start_rectx() -> Result<(), String> {
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
-    set_vertical_display_end(&vga, 480);
+    set_vertical_display_end(&mut vga, 480);
 
     fill_rectangle_x(&mut vga, 0, 0, 320, 240, 0, 0);
 

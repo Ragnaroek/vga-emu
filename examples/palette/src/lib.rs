@@ -26,7 +26,7 @@ pub async fn start_palette() -> Result<(), String> {
     let mut args = env::args();
     if args.len() == 2 {
         let palette = fs::read(args.nth(1).unwrap()).map_err(|e| e.to_string())?;
-        set_palette(&vga, &palette);
+        set_palette(&mut vga, &palette);
     }
 
     util::fill_rectangle_x(&mut vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, 0, 0);
@@ -59,7 +59,7 @@ pub async fn start_palette() -> Result<(), String> {
     }
 }
 
-pub fn set_palette(vga: &vga::VGA, palette: &[u8]) {
+pub fn set_palette(vga: &mut vga::VGA, palette: &[u8]) {
     assert_eq!(
         palette.len(),
         768,

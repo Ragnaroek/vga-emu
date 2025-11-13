@@ -71,7 +71,7 @@ impl RenderContext {
         })
     }
 
-    pub fn draw_frame(&self, vga: &VGAEmu) -> bool {
+    pub fn draw_frame(&self, vga: &mut VGAEmu) -> bool {
         let w = get_width(&vga);
         let h = get_height(&vga);
 
@@ -105,7 +105,7 @@ impl RenderContext {
             }
         }
 
-        set_de(&vga, true);
+        set_de(vga, true);
 
         if linear {
             render_linear(

@@ -72,7 +72,7 @@ impl RenderContext {
         })
     }
 
-    pub fn draw_frame(&mut self, vga: &VGAEmu) -> bool {
+    pub fn draw_frame(&mut self, vga: &mut VGAEmu) -> bool {
         let offset_delta = vga.regs.get_crt_data(CRTReg::Offset) as usize;
         if offset_delta == 0 {
             panic!("illegal CRT offset: {}", offset_delta);
@@ -85,7 +85,7 @@ impl RenderContext {
         let v_stretch = if vmode == 0x13 { 2 } else { 1 };
         let mem_offset = vga.mem_offset();
 
-        set_de(&vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
+        set_de(vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
         self.texture
             .with_lock(None, |buffer: &mut [u8], pitch: usize| {
                 if linear {
@@ -106,7 +106,7 @@ impl RenderContext {
         self.canvas.clear();
         self.canvas.copy(&self.texture, None, None).expect("copy");
         self.canvas.present();
-        set_de(&vga, false);
+        set_de(vga, false);
 
         let (emu_input, quit) = self.handle_keys();
         if quit {
@@ -114,9 +114,9 @@ impl RenderContext {
         }
 
         if self.simulate_vertical_reset {
-            set_vr(&vga, true);
+            set_vr(vga, true);
             sleep(Duration::from_micros(VERTICAL_RESET_MICRO));
-            set_vr(&vga, false);
+            set_vr(vga, false);
         }
 
         self.toggle_fullscreen(&emu_input);
