@@ -39,7 +39,7 @@ jobs:
           path: |
             ${{ github.workspace }}/SDL3/build
             ${{ github.workspace }}/SDL3/install
-            key: ${{ runner.os }}-sdl3-${{ hashFiles('**/CMakeLists.txt') }}
+          key: ${{ runner.os }}-sdl3-${{ hashFiles('**/CMakeLists.txt') }}
 
       - name: Clone SDL3 (if not cached)
         if: steps.cache-sdl.outputs.cache-hit != 'true'
@@ -50,7 +50,7 @@ jobs:
         if: steps.cache-sdl.outputs.cache-hit != 'true'
         run: |
           cd SDL3
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF -DSDL_X11_XSCRNSAVER=OFF
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=$GITHUB_WORKSPACE/SDL3/install -DSDL_TESTS=OFF -DSDL_X11_XTEST=OFF -DSDL_X11_XSCRNSAVER=OFF
           cmake --build build --config Release --parallel
           cmake --install build
 
