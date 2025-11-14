@@ -304,7 +304,7 @@ fn draw_border(vga: &mut vga::VGA, offset: usize) {
     }
 }
 
-fn draw_border_block(vga: &vga::VGA, offset: usize) {
+fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
     let mut di = offset;
     for _ in 0..8 {
         vga.write_mem(di, 0xff);

@@ -26,7 +26,7 @@ pub use backend_web::RenderContext;
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use std::sync::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use std::sync::RwLockWriteGuard;
 
 use input::InputMonitoring;
 use util::{get_height_regs, get_width_regs};
@@ -55,8 +55,8 @@ pub struct VGA {
 
 pub struct VGAEmu {
     regs: VGARegs,
-    palette_256: RwLock<[u32; 256]>,
-    pub mem: Mutex<Vec<Vec<u8>>>,
+    palette_256: [u32; 256],
+    pub mem: Vec<Vec<u8>>,
     pub start_addr_override: Option<usize>,
 }
 
@@ -323,24 +323,24 @@ impl VGA {
         self.vga_emu.get_color_palette_256_value(ix)
     }
 
-    pub fn write_mem(&self, offset: usize, v_in: u8) {
-        self.vga_emu.write_mem(offset, v_in)
+    pub fn write_mem(&mut self, offset: usize, v_in: u8) {
+        self.vga_emu.write_mem(offset, v_in);
     }
 
     pub fn read_mem(&mut self, offset: usize) -> u8 {
         self.vga_emu.read_mem(offset)
     }
 
-    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
+    pub fn raw_read_mem(&mut self, plane: usize, offset: usize) -> u8 {
         self.vga_emu.raw_read_mem(plane, offset)
     }
 
     //useful for testing, set the memory in a given plane
-    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
+    pub fn raw_write_mem(&mut self, plane: usize, offset: usize, v: u8) {
         self.vga_emu.raw_write_mem(plane, offset, v)
     }
 
-    pub fn write_mem_chunk(&self, offset: usize, v: &[u8]) {
+    pub fn write_mem_chunk(&mut self, offset: usize, v: &[u8]) {
         self.vga_emu.write_mem_chunk(offset, v)
     }
 
@@ -384,8 +384,8 @@ impl VGAEmu {
 
         VGAEmu {
             regs,
-            palette_256: RwLock::new(init_default_256_palette()),
-            mem: Mutex::new(mem),
+            palette_256: init_default_256_palette(),
+            mem,
             start_addr_override: builder.start_addr_override,
         }
     }
@@ -398,9 +398,8 @@ impl VGAEmu {
             let ix = self.get_color_reg(ColorReg::AddressWriteMode) as usize;
             let color_part_shift = (2 - writes) * 8;
 
-            let mut table = self.palette_256.write().unwrap();
-            table[ix] &= !((0xFF as u32) << color_part_shift);
-            table[ix] |= ((v & 0x3F) as u32) << color_part_shift;
+            self.palette_256[ix] &= !((0xFF as u32) << color_part_shift);
+            self.palette_256[ix] |= ((v & 0x3F) as u32) << color_part_shift;
 
             if writes == 2 {
                 self.regs.color_reg[ColorReg::AddressWriteMode as usize] =
@@ -432,12 +431,11 @@ impl VGAEmu {
 
     // Set through set_color_reg, this accesses the 256 palette directly
     pub fn get_color_palette_256_value(&self, ix: usize) -> u32 {
-        let table = self.palette_256.read().unwrap();
-        table[ix]
+        self.palette_256[ix]
     }
 
-    pub fn get_palette_256(&self) -> RwLockReadGuard<'_, [u32; 256]> {
-        self.palette_256.read().unwrap()
+    pub fn get_palette_256(&self) -> &[u32; 256] {
+        &self.palette_256
     }
 
     pub fn get_video_mode(&self) -> u8 {
@@ -445,7 +443,7 @@ impl VGAEmu {
     }
 
     /// Update VGA memory (destination depends on register state SCReg::MapMask)
-    pub fn write_mem(&self, offset: usize, v_in: u8) {
+    pub fn write_mem(&mut self, offset: usize, v_in: u8) {
         let mem_mode = self.regs.get_sc_data(SCReg::MemoryMode);
 
         let dest = if mem_mode & 0x08 != 0 {
@@ -462,7 +460,6 @@ impl VGAEmu {
         let bit_mask = self.regs.get_gc_data(GCReg::BitMask);
         gc_mode &= 0x03;
 
-        let mut mem_lock = self.mem.lock().unwrap();
         for i in 0..4 {
             if (dest & (1 << i)) != 0 {
                 let v = if gc_mode == 0x01 {
@@ -471,25 +468,23 @@ impl VGAEmu {
                     let v_latch = self.regs.latch_reg[i];
                     v_in & bit_mask | (v_latch & !bit_mask)
                 };
-                mem_lock[i][offset] = v;
+                self.mem[i][offset] = v;
             }
         }
     }
 
     //useful for testing, inspect the memory for a given plane
-    pub fn raw_read_mem(&self, plane: usize, offset: usize) -> u8 {
-        let lock_mem = self.mem.lock().unwrap();
-        lock_mem[plane][offset]
+    pub fn raw_read_mem(&mut self, plane: usize, offset: usize) -> u8 {
+        self.mem[plane][offset]
     }
 
     //useful for testing, set the memory in a given plane
-    pub fn raw_write_mem(&self, plane: usize, offset: usize, v: u8) {
-        let mut lock_mem = self.mem.lock().unwrap();
-        lock_mem[plane][offset] = v;
+    pub fn raw_write_mem(&mut self, plane: usize, offset: usize, v: u8) {
+        self.mem[plane][offset] = v;
     }
 
     /// Shortcut for setting a chunk of memory.
-    pub fn write_mem_chunk(&self, offset: usize, v: &[u8]) {
+    pub fn write_mem_chunk(&mut self, offset: usize, v: &[u8]) {
         for (i, v) in v.iter().enumerate() {
             self.write_mem(offset + i, *v);
         }
@@ -503,21 +498,10 @@ impl VGAEmu {
         } else {
             (self.regs.get_gc_data(GCReg::ReadMapSelect) & 0x3) as usize
         };
-        let lock_mem = self.mem.lock().unwrap();
         for i in 0..4 {
-            self.regs.latch_reg[i] = lock_mem[i][offset];
+            self.regs.latch_reg[i] = self.mem[i][offset];
         }
         self.regs.latch_reg[select]
-    }
-
-    pub fn mem_lock(&self) -> MutexGuard<'_, Vec<Vec<u8>>> {
-        self.mem.lock().unwrap()
-    }
-
-    pub fn raw_read_mem_with_lock(
-        &self, lock: &MutexGuard<Vec<Vec<u8>>>, plane: usize, offset: usize,
-    ) -> u8 {
-        lock[plane][offset]
     }
 
     pub fn mem_offset(&self) -> usize {

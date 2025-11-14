@@ -118,7 +118,7 @@ impl RenderContext {
             );
         } else {
             render_planar(
-                &vga,
+                vga,
                 mem_offset,
                 offset_delta,
                 h as usize,

@@ -43,7 +43,8 @@ pub trait PixelBuffer {
 /// pitch = length of one row in bytes
 #[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_planar<T: PixelBuffer + ?Sized>(
-    vga: &VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T, pitch: usize,
+    vga: &mut VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T,
+    pitch: usize,
 ) {
     let mut x: usize = 0;
     let mut y: usize = 0;
@@ -95,7 +96,6 @@ pub fn render_linear<T: PixelBuffer + ?Sized>(
     let max_scan = (vga.regs.get_crt_data(CRTReg::MaximumScanLine) & 0x1F) as usize + 1;
     let w_bytes = vga.regs.get_crt_data(CRTReg::HorizontalDisplayEnd) as usize + 1;
 
-    let mem_lock = vga.mem_lock();
     let palette_lock = vga.get_palette_256();
 
     let mut buffer_offset = 0;
@@ -103,7 +103,7 @@ pub fn render_linear<T: PixelBuffer + ?Sized>(
         for _ in 0..max_scan {
             for x_byte in 0..w_bytes {
                 for p in 0..4 {
-                    let v = mem_lock[p][mem_offset + x_byte];
+                    let v = vga.mem[p][mem_offset + x_byte];
                     let color = palette_lock[v as usize];
                     for _ in 0..v_stretch {
                         // each color part (RGB) contains the high-order 6 bit values.
