@@ -150,15 +150,15 @@ fn handle_key(up: bool, input: Arc<RwLock<InputMonitoring>>, event: web_sys::Eve
         .expect("a KeyboardEvent");
     let key = to_num_code(&keyboard_event.key());
     if key != NumCode::Bad {
-        input
-            .write()
-            .expect("input write")
-            .set_key_pressed(key, !up);
+        let mut im = input.write().expect("input write");
+        im.set_key_pressed(key, !up);
+        if !up {
+            im.keyboard.update_last_value(key);
+        }
     }
 }
 
 fn to_num_code(key: &str) -> NumCode {
-    //panic!("key = {}", key);
     match key {
         "ArrowUp" => NumCode::UpArrow,
         "ArrowDown" => NumCode::DownArrow,
@@ -166,6 +166,7 @@ fn to_num_code(key: &str) -> NumCode {
         "ArrowRight" => NumCode::RightArrow,
         "Control" => NumCode::Control,
         "Enter" => NumCode::Return,
+        "Escape" => NumCode::Escape,
         " " => NumCode::Space,
         // TODO map all key names to NumCode!
         _ => NumCode::Bad,
