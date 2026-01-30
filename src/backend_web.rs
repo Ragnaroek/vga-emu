@@ -56,10 +56,10 @@ impl RenderContext {
             Closure::wrap(Box::new(move |e: web_sys::Event| {
                 handle_key(true, mon_up.clone(), e)
             }));
-        document
+        canvas
             .add_event_listener_with_callback("keydown", keydown_handler.as_ref().unchecked_ref())
             .expect("add keydown event");
-        document
+        canvas
             .add_event_listener_with_callback("keyup", keyup_handler.as_ref().unchecked_ref())
             .expect("add keyup event");
         keydown_handler.forget();
