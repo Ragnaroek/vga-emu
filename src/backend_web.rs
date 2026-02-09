@@ -148,9 +148,10 @@ fn handle_key(up: bool, input: Arc<RwLock<InputMonitoring>>, event: web_sys::Eve
     let keyboard_event = event
         .dyn_into::<web_sys::KeyboardEvent>()
         .expect("a KeyboardEvent");
-    let key = to_num_code(&keyboard_event.key());
+    let (key, shift) = to_num_code(&keyboard_event.key());
     if key != NumCode::Bad {
         let mut im = input.write().expect("input write");
+        im.set_key_pressed(NumCode::LShift, shift);
         im.set_key_pressed(key, !up);
         if !up {
             im.keyboard.update_last_value(key);
@@ -158,18 +159,21 @@ fn handle_key(up: bool, input: Arc<RwLock<InputMonitoring>>, event: web_sys::Eve
     }
 }
 
-fn to_num_code(key: &str) -> NumCode {
+fn to_num_code(key: &str) -> (NumCode, bool) {
+    web_sys::console::log_1(&format!("got key {}", key).into());
     match key {
-        "ArrowUp" => NumCode::UpArrow,
-        "ArrowDown" => NumCode::DownArrow,
-        "ArrowLeft" => NumCode::LeftArrow,
-        "ArrowRight" => NumCode::RightArrow,
-        "Control" => NumCode::Control,
-        "Enter" => NumCode::Return,
-        "Escape" => NumCode::Escape,
-        " " => NumCode::Space,
+        "ArrowUp" => (NumCode::UpArrow, false),
+        "ArrowDown" => (NumCode::DownArrow, false),
+        "ArrowLeft" => (NumCode::LeftArrow, false),
+        "ArrowRight" => (NumCode::RightArrow, false),
+        "Control" => (NumCode::Control, false),
+        "Enter" => (NumCode::Return, false),
+        "Escape" => (NumCode::Escape, false),
+        " " => (NumCode::Space, false),
+        "a" => (NumCode::A, false),
+        "A" => (NumCode::A, true),
         // TODO map all key names to NumCode!
-        _ => NumCode::Bad,
+        _ => (NumCode::Bad, false),
     }
 }
 
