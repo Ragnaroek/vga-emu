@@ -21,7 +21,7 @@ build-examples:
 
 build-all: build-sdl build-sdl2 build-web build-examples
 
-test:
+test: build-all
     cargo test --features test
 
 publish:

@@ -263,6 +263,7 @@ fn to_num_code(keycode: Keycode) -> NumCode {
         Keycode::PageUp => return NumCode::PgUp,
         Keycode::PageDown => return NumCode::PgDn,
         Keycode::Minus => return NumCode::Minus,
+        Keycode::Plus => return NumCode::Plus,
         Keycode::Equals => return NumCode::Equals,
         Keycode::LeftBracket => return NumCode::LeftBracket,
         Keycode::RightBracket => return NumCode::RightBracket,
