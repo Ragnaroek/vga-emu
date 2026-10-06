@@ -24,8 +24,8 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
-sdl = [
-    "vga-emu/sdl",
+sdl3 = [
+    "vga-emu/sdl3",
 ]
 sdl2 = [
     "vga-emu/sdl2",

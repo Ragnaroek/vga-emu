@@ -3,7 +3,7 @@
 #[cfg(feature = "tracing")]
 use tracing::instrument;
 
-use crate::{CRTReg, GeneralReg, VGARegs};
+use crate::{CRTReg, GeneralReg, RenderBackend, VGARegs};
 use crate::{GCReg, PLANE_SIZE, SCReg, VGA, VGAEmu};
 
 const SCREEN_WIDTH: usize = 80;
@@ -72,8 +72,8 @@ pub fn set_vr(vga: &mut VGAEmu, set: bool) {
 
 /// Drawing helper
 
-pub fn fill_pattern_x(
-    vga: &mut VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
+pub fn fill_pattern_x<R: RenderBackend>(
+    vga: &mut VGA<R>, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
     pattern: &[u8; 16],
 ) {
     if end_x <= start_x || end_y <= start_y {
@@ -137,8 +137,8 @@ pub fn fill_pattern_x(
     vga.vga_emu.regs.set_gc_data(GCReg::BitMask, 0xFF);
 }
 
-pub fn fill_rectangle_x(
-    vga: &mut VGA, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
+pub fn fill_rectangle_x<R: RenderBackend>(
+    vga: &mut VGA<R>, start_x: usize, start_y: usize, end_x: usize, end_y: usize, page_base: usize,
     color: u8,
 ) {
     if end_x <= start_x || end_y <= start_y {
@@ -175,8 +175,8 @@ pub fn fill_rectangle_x(
     }
 }
 
-pub fn copy_screen_to_screen_x(
-    vga: &mut VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
+pub fn copy_screen_to_screen_x<R: RenderBackend>(
+    vga: &mut VGA<R>, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
     dst_start_x: usize, dst_start_y: usize, src_page_base: usize, dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize,
 ) {
@@ -224,8 +224,8 @@ pub fn copy_screen_to_screen_x(
 }
 
 //TODO fix dst offset shifted by some pixel, why?
-pub fn copy_system_to_screen_masked_x(
-    vga: &mut VGA, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
+pub fn copy_system_to_screen_masked_x<R: RenderBackend>(
+    vga: &mut VGA<R>, src_start_x: usize, src_start_y: usize, src_end_x: usize, src_end_y: usize,
     dst_start_x: usize, dst_start_y: usize, source: &[u8], dst_page_base: usize,
     src_bitmap_width: usize, dst_bitmap_width: usize, mask: &[u8],
 ) {
@@ -257,7 +257,7 @@ pub fn copy_system_to_screen_masked_x(
     }
 }
 
-#[cfg(any(feature = "sdl", feature = "test", feature = "sdl2"))]
+#[cfg(any(feature = "sdl3", feature = "test", feature = "sdl2"))]
 /// task sleep that works with all the different backends
 pub async fn sleep(millis: u32) {
     tokio::time::sleep(std::time::Duration::from_millis(millis as u64)).await;
@@ -286,7 +286,7 @@ where
     wasm_bindgen_futures::spawn_local(future);
 }
 
-#[cfg(any(feature = "sdl", feature = "test", feature = "sdl2"))]
+#[cfg(any(feature = "sdl3", feature = "test", feature = "sdl2"))]
 /// async task spawner that works with all the different backends.
 /// The task is always spawned in the current thread to avoid
 /// Send issues.

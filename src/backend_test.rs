@@ -1,22 +1,28 @@
-use crate::{InputMonitoring, VGABuilder, VGAEmu};
+use crate::{InputMonitoring, RenderBackend, VGABuilder, VGAEmu};
 use std::sync::{RwLock, RwLockWriteGuard};
 
-pub struct RenderContext {
+pub struct TestRenderBackend {
     input_monitoring: RwLock<InputMonitoring>,
 }
 
-impl RenderContext {
-    pub fn init(_: usize, _: usize, _: VGABuilder) -> Result<RenderContext, String> {
-        Ok(RenderContext {
+impl TestRenderBackend {
+    pub fn new() -> TestRenderBackend {
+        TestRenderBackend {
             input_monitoring: RwLock::new(InputMonitoring::new()),
-        })
+        }
+    }
+}
+
+impl RenderBackend for TestRenderBackend {
+    fn init(&mut self, _: usize, _: usize, _: VGABuilder) -> Result<(), String> {
+        Ok(())
     }
 
-    pub fn draw_frame(&mut self, _: &VGAEmu) -> bool {
+    fn draw_frame(&mut self, _: &mut VGAEmu) -> bool {
         false
     }
 
-    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+    fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
         self.input_monitoring
             .write()
             .expect("write lock InputMonitoring")

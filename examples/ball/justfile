@@ -4,8 +4,8 @@ build-web:
 run-web: build-web
 	miniserve ./
 
-build-sdl:
-    cargo build --features sdl
+build-sdl3:
+    cargo build --features sdl3
 
 build-sdl2:
     cargo build --features sdl2

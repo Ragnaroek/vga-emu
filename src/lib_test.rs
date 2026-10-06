@@ -1,3 +1,4 @@
+use crate::backend_test::TestRenderBackend;
 use crate::util::{get_height, get_width};
 use crate::{
     ColorReg, GCReg, PLANE_SIZE, SCReg, VGABuilder, set_horizontal_display_end,
@@ -6,7 +7,7 @@ use crate::{
 
 #[test]
 fn test_write_read_mem_mode_0() -> Result<(), String> {
-    let mut vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build(TestRenderBackend::new())?;
     vga.write_mem(666, 42);
     assert_eq!(vga.read_mem(666), 0);
 
@@ -31,7 +32,7 @@ fn test_write_read_mem_mode_0() -> Result<(), String> {
 
 #[test]
 fn test_write_read_mem_mode_1() -> Result<(), String> {
-    let mut vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build(TestRenderBackend::new())?;
     vga.set_sc_data(SCReg::MapMask, 0x0F);
     vga.write_mem(666, 66);
     for i in 0..4 {
@@ -53,7 +54,9 @@ fn test_write_read_mem_mode_1() -> Result<(), String> {
 
 #[test]
 fn test_write_read_chain_4() -> Result<(), String> {
-    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
+    let mut vga = VGABuilder::new()
+        .video_mode(0x13)
+        .build(TestRenderBackend::new())?; //mode 13 has chain4 enabled (also odd/even is enabled but this is ignored if chain4 is enabled)
     for i in 0..PLANE_SIZE {
         vga.write_mem(i, i as u8);
         for p in 0..4 {
@@ -79,7 +82,9 @@ fn test_write_read_chain_4() -> Result<(), String> {
 
 #[test]
 fn test_write_read_odd_even() -> Result<(), String> {
-    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
+    let mut vga = VGABuilder::new()
+        .video_mode(0x13)
+        .build(TestRenderBackend::new())?; //mode 13 has odd/even enabled
     vga.set_sc_data(
         SCReg::MemoryMode,
         vga.get_sc_data(SCReg::MemoryMode) & !0x08,
@@ -99,7 +104,9 @@ fn test_write_read_odd_even() -> Result<(), String> {
 
 #[test]
 fn test_bit_mask() -> Result<(), String> {
-    let mut vga = VGABuilder::new().video_mode(0x13).build()?; //mode 13 has odd/even enabled
+    let mut vga = VGABuilder::new()
+        .video_mode(0x13)
+        .build(TestRenderBackend::new())?; //mode 13 has odd/even enabled
     vga.set_sc_data(SCReg::MapMask, 0xFF);
     vga.write_mem(666, 0xFF);
     for i in 0..4 {
@@ -126,7 +133,7 @@ fn test_bit_mask() -> Result<(), String> {
 
 #[test]
 fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
-    let mut vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build(TestRenderBackend::new())?;
     set_horizontal_display_end(&mut vga, 640);
     assert_eq!(get_width(&vga.vga_emu), 640);
     Ok(())
@@ -134,7 +141,7 @@ fn test_set_and_get_horizontal_display_end() -> Result<(), String> {
 
 #[test]
 fn test_set_and_get_vertical_display_end() -> Result<(), String> {
-    let mut vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build(TestRenderBackend::new())?;
     set_vertical_display_end(&mut vga, 400);
     assert_eq!(get_height(&vga.vga_emu), 400);
 
@@ -145,7 +152,7 @@ fn test_set_and_get_vertical_display_end() -> Result<(), String> {
 
 #[test]
 fn test_set_color() -> Result<(), String> {
-    let mut vga = VGABuilder::new().build()?;
+    let mut vga = VGABuilder::new().build(TestRenderBackend::new())?;
     vga.set_color_reg(ColorReg::AddressWriteMode, 0);
 
     for i in 0..3 {

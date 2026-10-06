@@ -1,0 +1,9 @@
+CURR: make tests works with new backend structure!
+==> build ball example with sdl2 and check if working (requires inet)
+==> install SDL3 lib for sdl3 backend (reuqires inet)
+
+
+
+- Rename 'web' feature to webCanvas (or web-canvas?, what is the convention?)
+- Remove tracing feature
+- Configure 'all' targets in .zed/settings.json (should work after the backend upgrade)!!
