@@ -1,8 +1,14 @@
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "sdl2")]
+use vga::backend_sdl2::Sdl2RenderBackend;
+#[cfg(feature = "sdl3")]
+use vga::backend_sdl3::Sdl3RenderBackend;
+#[cfg(feature = "web")]
+use vga::backend_web::WebCanvasRenderBackend;
 //Example from https://www.phatcode.net/res/224/files/html/ch31/31-03.html (LISTING 31.3)
-use vga::{CRTReg, GCReg, SCReg, VGABuilder, input::NumCode, util::sleep};
+use vga::{CRTReg, GCReg, RenderBackend, SCReg, VGA, VGABuilder, input::NumCode, util::sleep};
 
 const SCREEN_WIDTH: usize = 320;
 
@@ -28,13 +34,35 @@ fn new_line(
     }
 }
 
-pub async fn start_m320x400() -> Result<(), String> {
-    let mut vga = VGABuilder::new()
+pub async fn start_m320x400(arg: String) -> Result<(), String> {
+    let builder = VGABuilder::new()
         .video_mode(0x13)
         .title("VGA m320x400 Example".to_string())
-        .fullscreen(false)
-        .build()?;
+        .fullscreen(false);
 
+    match arg.as_str() {
+        #[cfg(feature = "sdl3")]
+        "sdl3" | "" => run_m320x400(builder.build(Sdl3RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl3"))]
+        "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
+
+        #[cfg(feature = "sdl2")]
+        "sdl2" => run_m320x400(builder.build(Sdl2RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl2"))]
+        "sdl2" => return Err("sdl2 backend not available (build with --features sdl2)".to_string()),
+
+        #[cfg(feature = "web")]
+        "web" => run_m320x400(builder.build(WebCanvasRenderBackend::new())?).await,
+        #[cfg(not(feature = "web"))]
+        "web" => {
+            return Err("web backend not available (build with --features web)".to_string());
+        }
+
+        other => return Err(format!("unknown backend: {}", other)),
+    }
+}
+
+async fn run_m320x400<R: RenderBackend>(mut vga: VGA<R>) -> Result<(), String> {
     //set 320x400 mode
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
@@ -99,7 +127,7 @@ pub async fn start_m320x400() -> Result<(), String> {
     }
 }
 
-fn write_pixel(vga: &mut vga::VGA, x: i16, y: i16, color: u8) {
+fn write_pixel<R: RenderBackend>(vga: &mut vga::VGA<R>, x: i16, y: i16, color: u8) {
     let mut offset = (SCREEN_WIDTH / 4) * y as usize;
     offset += x as usize / 4;
 

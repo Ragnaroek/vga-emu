@@ -7,7 +7,7 @@ pub fn start_kite_web() {
     console_error_panic_hook::set_once();
 
     vga::util::spawn_async(async move {
-        start_kite()
+        start_kite("web".to_string())
             .await
             .expect("kite demo finished without error");
     });

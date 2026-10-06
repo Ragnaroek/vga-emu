@@ -7,7 +7,7 @@ pub fn start_rectx_web() {
     console_error_panic_hook::set_once();
 
     vga::util::spawn_async(async move {
-        start_rectx()
+        start_rectx("web".to_string())
             .await
             .expect("rectx demo finished without error");
     });

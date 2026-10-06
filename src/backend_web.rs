@@ -4,24 +4,37 @@ use wasm_bindgen::Clamped;
 use wasm_bindgen::prelude::*;
 use web_sys::CanvasRenderingContext2d;
 
+use crate::RenderBackend;
 use crate::backend::{PixelBuffer, is_linear, render_linear, render_planar};
 use crate::input::{InputMonitoring, NumCode};
 use crate::util::{get_height, get_width, set_de};
 use crate::{CRTReg, VGABuilder, VGAEmu};
 
-pub struct RenderContext {
+pub struct WebCanvasRenderBackend {
+    backend: Option<WebCanvasBackend>,
+}
+
+impl WebCanvasRenderBackend {
+    pub fn new() -> WebCanvasRenderBackend {
+        WebCanvasRenderBackend { backend: None }
+    }
+}
+
+pub struct WebCanvasBackend {
     ctx: CanvasRenderingContext2d,
     input_monitoring: Arc<RwLock<InputMonitoring>>,
 }
 
-struct WebBuffer {
-    data: Vec<u8>,
+impl WebCanvasBackend {
+    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+        self.input_monitoring
+            .write()
+            .expect("write lock to InputMonitoring")
+    }
 }
 
-impl RenderContext {
-    pub fn init(
-        width: usize, height: usize, _builder: VGABuilder,
-    ) -> Result<RenderContext, String> {
+impl RenderBackend for WebCanvasRenderBackend {
+    fn init(&mut self, width: usize, height: usize, _builder: &VGABuilder) -> Result<(), String> {
         let document = web_sys::window().unwrap().document().unwrap();
 
         let canvas = document
@@ -65,13 +78,15 @@ impl RenderContext {
         keydown_handler.forget();
         keyup_handler.forget();
 
-        Ok(RenderContext {
+        self.backend = Some(WebCanvasBackend {
             ctx,
-            input_monitoring: input_monitoring,
-        })
+            input_monitoring,
+        });
+
+        Ok(())
     }
 
-    pub fn draw_frame(&self, vga: &mut VGAEmu) -> bool {
+    fn draw_frame(&mut self, vga: &mut VGAEmu) -> bool {
         let w = get_width(&vga);
         let h = get_height(&vga);
 
@@ -127,21 +142,26 @@ impl RenderContext {
             );
         }
 
+        let be = self.backend.as_mut().expect("init");
+
         let image_data = web_sys::ImageData::new_with_u8_clamped_array(Clamped(&buffer.data), w)
             .expect("image data");
-        self.ctx
+        be.ctx
             .put_image_data(&image_data, 0.0, 0.0)
             .expect("put image data");
-        self.ctx.begin_path();
+        be.ctx.begin_path();
 
         false
     }
 
-    pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
-        self.input_monitoring
-            .write()
-            .expect("write access to InputMonitoring")
+    fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+        let be = self.backend.as_mut().expect("init");
+        be.input_monitoring()
     }
+}
+
+struct WebBuffer {
+    data: Vec<u8>,
 }
 
 fn handle_key(up: bool, input: Arc<RwLock<InputMonitoring>>, event: web_sys::Event) {

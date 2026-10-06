@@ -11,13 +11,16 @@ build-sdl2:
 build-sdl-tracing:
 	cargo build --release --features sdl,tracing
 
+build-egui:
+    cargo build --features egui
+
 build-examples:
-	cd examples/ball && just build-sdl && just build-sdl2 && just build-web
-	cd examples/palette && just build-sdl && just build-sdl2 && just build-web
-	cd examples/m320x400 && just build-sdl && just build-sdl2 && just build-web
-	cd examples/patternx && just build-sdl && just build-sdl2 && just build-web
-	cd examples/rectx && just build-sdl && just build-sdl2 && just build-web
-	cd examples/kite && just build-sdl && just build-sdl2 && just build-web
+	cd examples/ball && just build-all
+	cd examples/palette && just build-all
+	cd examples/m320x400 && just build-all
+	cd examples/patternx && just build-all
+	cd examples/rectx && just build-sdl3 && just build-sdl2 && just build-web
+	cd examples/kite && just build-all
 
 build-all: build-sdl build-sdl2 build-web build-examples
 

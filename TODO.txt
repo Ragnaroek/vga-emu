@@ -1,0 +1,11 @@
+CURR:
+- update all examples/ with new backend structure
+---> add backend string name to title of window!
+
+
+- impl EGuiBackend as dummy
+=== commit
+
+- dependency updates examples
+
+- Remove tracing feature
