@@ -3,8 +3,14 @@
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "sdl2")]
+use vga::backend_sdl2::Sdl2RenderBackend;
+#[cfg(feature = "sdl3")]
+use vga::backend_sdl3::Sdl3RenderBackend;
+#[cfg(feature = "web")]
+use vga::backend_web::WebCanvasRenderBackend;
 /// Ball example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-23.md
-use vga::{AttributeReg, CRTReg, GCReg, SCReg, VGABuilder, util::sleep};
+use vga::{AttributeReg, CRTReg, GCReg, RenderBackend, SCReg, VGA, VGABuilder, util::sleep};
 
 const LOGICAL_SCREEN_WIDTH: usize = 672 / 8; //width in bytes and height in scan
 const LOGICAL_SCREEN_HEIGHT: usize = 384; //lines of the virtual screen we'll work with
@@ -80,12 +86,34 @@ fn initial_render_state() -> RenderState {
     }
 }
 
-pub async fn start_ball() -> Result<(), String> {
-    let mut vga = VGABuilder::new()
+pub async fn start_ball(arg: String) -> Result<(), String> {
+    let builder = VGABuilder::new()
         .fullscreen(false)
-        .title("VGA Ball Example".to_string())
-        .build()?;
+        .title(format!("VGA Ball Example ({})", arg));
 
+    match arg.as_str() {
+        #[cfg(feature = "sdl3")]
+        "sdl3" | "" => run_ball(builder.build(Sdl3RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl3"))]
+        "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
+
+        #[cfg(feature = "sdl2")]
+        "sdl2" => run_ball(builder.build(Sdl2RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl2"))]
+        "sdl2" => return Err("sdl2 backend not available (build with --features sdl2)".to_string()),
+
+        #[cfg(feature = "web")]
+        "web" => run_ball(builder.build(WebCanvasRenderBackend::new())?).await,
+        #[cfg(not(feature = "web"))]
+        "web" => {
+            return Err("web backend not available (build with --features web)".to_string());
+        }
+
+        other => return Err(format!("unknown backend: {}", other)),
+    }
+}
+
+async fn run_ball<R: RenderBackend>(mut vga: VGA<R>) -> Result<(), String> {
     draw_border(&mut vga, PAGE0_OFFSET);
     draw_border(&mut vga, PAGE1_OFFSET);
 
@@ -245,7 +273,9 @@ pub async fn start_ball() -> Result<(), String> {
     }
 }
 
-fn draw_ball(vga: &mut vga::VGA, src_offset: usize, page_offset: usize, x: usize, y: usize) {
+fn draw_ball<R: RenderBackend>(
+    vga: &mut vga::VGA<R>, src_offset: usize, page_offset: usize, x: usize, y: usize,
+) {
     let offset = page_offset + (y * LOGICAL_SCREEN_WIDTH + x);
     let mut si = src_offset;
     let mut di = offset;
@@ -261,7 +291,7 @@ fn draw_ball(vga: &mut vga::VGA, src_offset: usize, page_offset: usize, x: usize
     }
 }
 
-fn draw_border(vga: &mut vga::VGA, offset: usize) {
+fn draw_border<R: RenderBackend>(vga: &mut vga::VGA<R>, offset: usize) {
     let mut di = offset;
     //left border
     for _ in 0..(LOGICAL_SCREEN_HEIGHT / 16) {
@@ -304,7 +334,7 @@ fn draw_border(vga: &mut vga::VGA, offset: usize) {
     }
 }
 
-fn draw_border_block(vga: &mut vga::VGA, offset: usize) {
+fn draw_border_block<R: RenderBackend>(vga: &mut vga::VGA<R>, offset: usize) {
     let mut di = offset;
     for _ in 0..8 {
         vga.write_mem(di, 0xff);

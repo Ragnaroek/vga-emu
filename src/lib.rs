@@ -3,25 +3,16 @@
 mod lib_test;
 
 pub mod backend;
-#[cfg(feature = "sdl")]
-pub mod backend_sdl;
 #[cfg(feature = "sdl2")]
 pub mod backend_sdl2;
+#[cfg(feature = "sdl3")]
+pub mod backend_sdl3;
 #[cfg(feature = "test")]
 pub mod backend_test;
 #[cfg(feature = "web")]
 pub mod backend_web;
 pub mod input;
 pub mod util;
-
-#[cfg(feature = "sdl")]
-pub use backend_sdl::RenderContext;
-#[cfg(feature = "sdl2")]
-pub use backend_sdl2::RenderContext;
-#[cfg(feature = "test")]
-pub use backend_test::RenderContext;
-#[cfg(feature = "web")]
-pub use backend_web::RenderContext;
 
 #[cfg(feature = "tracing")]
 use tracing::instrument;
@@ -48,9 +39,16 @@ pub struct VGARegs {
     video_mode: u8,
 }
 
-pub struct VGA {
+pub trait RenderBackend {
+    /// will be called by the VGA implementation on startup to initialise the backend.
+    fn init(&mut self, width: usize, height: usize, builder: &VGABuilder) -> Result<(), String>;
+    fn draw_frame(&mut self, vga: &mut VGAEmu) -> bool;
+    fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring>;
+}
+
+pub struct VGA<R: RenderBackend> {
     vga_emu: VGAEmu,
-    rc: RenderContext,
+    rb: R,
 }
 
 pub struct VGAEmu {
@@ -246,24 +244,25 @@ impl VGABuilder {
 
     /// Constructs a VGA depending on the compile options (see
     /// features list for available options)
-    pub fn build(self) -> Result<VGA, String> {
-        VGA::setup(self)
+    pub fn build<R: RenderBackend>(self, rb: R) -> Result<VGA<R>, String> {
+        VGA::setup(self, rb)
     }
 }
 
-impl VGA {
-    pub fn setup(builder: VGABuilder) -> Result<VGA, String> {
+impl<R: RenderBackend> VGA<R> {
+    pub fn setup(builder: VGABuilder, mut rb: R) -> Result<VGA<R>, String> {
         let vga_emu = VGAEmu::new(&builder);
 
         let width = get_width_regs(&vga_emu.regs);
         let height = get_height_regs(&vga_emu.regs);
-        let rc = RenderContext::init(width as usize, height as usize, builder)?;
 
-        Ok(VGA { vga_emu, rc })
+        rb.init(width as usize, height as usize, &builder)?;
+
+        Ok(VGA { vga_emu, rb })
     }
 
     pub fn draw_frame(&mut self) -> bool {
-        self.rc.draw_frame(&mut self.vga_emu)
+        self.rb.draw_frame(&mut self.vga_emu)
     }
 
     pub fn set_sc_data(&mut self, reg: SCReg, v: u8) {
@@ -345,7 +344,7 @@ impl VGA {
     }
 
     pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
-        self.rc.input_monitoring()
+        self.rb.input_monitoring()
     }
 }
 
@@ -577,7 +576,7 @@ fn set_regs_horizontal_display_end(regs: &mut VGARegs, width: u32) {
     regs.set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
 }
 
-pub fn set_horizontal_display_end(vga: &mut VGA, width: u32) {
+pub fn set_horizontal_display_end<R: RenderBackend>(vga: &mut VGA<R>, width: u32) {
     vga.vga_emu
         .regs
         .set_crt_data(CRTReg::HorizontalDisplayEnd, ((width - 1) / 8) as u8);
@@ -592,6 +591,6 @@ fn set_regs_vertical_display_end(regs: &mut VGARegs, height: u32) {
     regs.set_crt_data(CRTReg::Overflow, overflow);
 }
 
-pub fn set_vertical_display_end(vga: &mut VGA, height: u32) {
+pub fn set_vertical_display_end<R: RenderBackend>(vga: &mut VGA<R>, height: u32) {
     set_regs_vertical_display_end(&mut vga.vga_emu.regs, height);
 }

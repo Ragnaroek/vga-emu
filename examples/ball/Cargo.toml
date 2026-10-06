@@ -24,12 +24,13 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
-sdl = [
-    "vga-emu/sdl",
+sdl3 = [
+    "vga-emu/sdl3",
 ]
 sdl2 = [
     "vga-emu/sdl2",
 ]
+all = ["sdl3", "sdl2", "web"]
 
 [dependencies]
 vga-emu = { path = "../../" }

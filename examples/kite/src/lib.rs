@@ -1,9 +1,15 @@
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "sdl2")]
+use vga::backend_sdl2::Sdl2RenderBackend;
+#[cfg(feature = "sdl3")]
+use vga::backend_sdl3::Sdl3RenderBackend;
+#[cfg(feature = "web")]
+use vga::backend_web::WebCanvasRenderBackend;
 //Kite example from https://github.com/jagregory/abrash-black-book/blob/master/src/chapter-49.md (LISTING 49.5)
 use vga::{
-    SCReg, VGABuilder, set_vertical_display_end,
+    RenderBackend, SCReg, VGA, VGABuilder, set_vertical_display_end,
     util::{
         copy_screen_to_screen_x, copy_system_to_screen_masked_x, fill_pattern_x, fill_rectangle_x,
         sleep,
@@ -32,13 +38,35 @@ static SMOKE_MASK: [u8; 49] = [
     1, 1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0,
 ];
 
-pub async fn start_kite() -> Result<(), String> {
-    let mut vga = VGABuilder::new()
+pub async fn start_kite(arg: String) -> Result<(), String> {
+    let builder = VGABuilder::new()
         .video_mode(0x13)
-        .title("VGA Kite Example".to_string())
-        .fullscreen(false)
-        .build()?;
+        .title(format!("VGA Kite Example ({})", arg))
+        .fullscreen(false);
 
+    match arg.as_str() {
+        #[cfg(feature = "sdl3")]
+        "sdl3" | "" => run_kite(builder.build(Sdl3RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl3"))]
+        "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
+
+        #[cfg(feature = "sdl2")]
+        "sdl2" => run_kite(builder.build(Sdl2RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl2"))]
+        "sdl2" => return Err("sdl2 backend not available (build with --features sdl2)".to_string()),
+
+        #[cfg(feature = "web")]
+        "web" => run_kite(builder.build(WebCanvasRenderBackend::new())?).await,
+        #[cfg(not(feature = "web"))]
+        "web" => {
+            return Err("web backend not available (build with --features web)".to_string());
+        }
+
+        other => return Err(format!("unknown backend: {}", other)),
+    }
+}
+
+async fn run_kite<R: RenderBackend>(mut vga: VGA<R>) -> Result<(), String> {
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even
@@ -82,7 +110,7 @@ pub async fn start_kite() -> Result<(), String> {
     }
 }
 
-fn draw_background(vga: &mut vga::VGA, page_start: usize) {
+fn draw_background<R: RenderBackend>(vga: &mut vga::VGA<R>, page_start: usize) {
     //cyan background
     fill_rectangle_x(vga, 0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, page_start, 11);
     //brown plain

@@ -1,0 +1,5 @@
+CURR:
+- dependency updates examples
+- Remove tracing feature
+
+- implement Egui backend!!

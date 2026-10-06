@@ -1,20 +1,48 @@
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "sdl2")]
+use vga::backend_sdl2::Sdl2RenderBackend;
+#[cfg(feature = "sdl3")]
+use vga::backend_sdl3::Sdl3RenderBackend;
+#[cfg(feature = "web")]
+use vga::backend_web::WebCanvasRenderBackend;
 //Example from https://www.phatcode.net/res/224/files/html/ch47/47-07.html (LISTING 47.6)
-use vga::{SCReg, set_vertical_display_end};
+use vga::{RenderBackend, SCReg, VGA, set_vertical_display_end};
 use vga::{
     VGABuilder,
     util::{fill_rectangle_x, sleep},
 };
 
-pub async fn start_rectx() -> Result<(), String> {
-    let mut vga = VGABuilder::new()
+pub async fn start_rectx(arg: String) -> Result<(), String> {
+    let builder = VGABuilder::new()
         .video_mode(0x13)
-        .title("VGA RectX Example".to_string())
-        .fullscreen(false)
-        .build()?;
+        .title(format!("VGA RectX Example ({})", arg).to_string())
+        .fullscreen(false);
 
+    match arg.as_str() {
+        #[cfg(feature = "sdl3")]
+        "sdl3" | "" => run_rectx(builder.build(Sdl3RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl3"))]
+        "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
+
+        #[cfg(feature = "sdl2")]
+        "sdl2" => run_rectx(builder.build(Sdl2RenderBackend::new())?).await,
+        #[cfg(not(feature = "sdl2"))]
+        "sdl2" => return Err("sdl2 backend not available (build with --features sdl2)".to_string()),
+
+        #[cfg(feature = "web")]
+        "web" => run_rectx(builder.build(WebCanvasRenderBackend::new())?).await,
+        #[cfg(not(feature = "web"))]
+        "web" => {
+            return Err("web backend not available (build with --features web)".to_string());
+        }
+
+        other => return Err(format!("unknown backend: {}", other)),
+    }
+}
+
+async fn run_rectx<R: RenderBackend>(mut vga: VGA<R>) -> Result<(), String> {
     //enable Mode X
     let mem_mode = vga.get_sc_data(SCReg::MemoryMode);
     vga.set_sc_data(SCReg::MemoryMode, (mem_mode & !0x08) | 0x04); //turn off chain 4 & odd/even

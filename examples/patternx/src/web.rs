@@ -7,7 +7,7 @@ pub fn start_patternx_web() {
     console_error_panic_hook::set_once();
 
     vga::util::spawn_async(async move {
-        start_patternx()
+        start_patternx("web".to_string())
             .await
             .expect("patternx demo finished without error");
     });

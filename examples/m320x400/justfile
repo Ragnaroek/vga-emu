@@ -1,17 +1,20 @@
 build-web:
 	wasm-pack build --debug --target web --features web
 
-run-web: build-web
-	miniserve ./
-
-build-sdl:
-    cargo build --features sdl
+build-sdl3:
+    cargo build --features sdl3
 
 build-sdl2:
     cargo build --features sdl2
 
-run-sdl:
-	cargo run --features sdl
+build-all:
+    cargo build --features all
+
+run-web: build-web
+	miniserve ./
+
+run-sdl3:
+	cargo run --features sdl3 -- sdl3
 
 run-sdl2:
-	cargo run --features sdl2
+	cargo run --features sdl2 -- sdl2

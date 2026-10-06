@@ -40,6 +40,16 @@ pub trait PixelBuffer {
     fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8);
 }
 
+impl PixelBuffer for [u8] {
+    // TODO Use dedicated SDLBuffer here instead of [u8]
+    const PIXEL_WIDTH: usize = 3;
+    fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8) {
+        self[offset] = r;
+        self[offset + 1] = g;
+        self[offset + 2] = b;
+    }
+}
+
 /// pitch = length of one row in bytes
 #[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_planar<T: PixelBuffer + ?Sized>(

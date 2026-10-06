@@ -13,12 +13,31 @@ use sdl3::{
     video::Window,
 };
 
-use crate::backend::{EmuInput, PixelBuffer, is_linear, render_linear, render_planar};
+use crate::backend::{EmuInput, is_linear, render_linear, render_planar};
 use crate::input::{InputMonitoring, MouseButton, NumCode};
 use crate::util::{set_de, set_vr};
-use crate::{CRTReg, VERTICAL_RESET_MICRO, VGABuilder, VGAEmu};
+use crate::{CRTReg, RenderBackend, VERTICAL_RESET_MICRO, VGABuilder, VGAEmu};
 
-pub struct RenderContext {
+pub struct Sdl3RenderBackend {
+    backend: Option<Sdl3Backend>,
+}
+
+impl Sdl3RenderBackend {
+    pub fn new() -> Sdl3RenderBackend {
+        Sdl3RenderBackend { backend: None }
+    }
+
+    fn toggle_fullscreen(&mut self, emu_input: &EmuInput) {
+        let be = self.backend.as_mut().expect("init");
+
+        if emu_input.alt == true && emu_input.f == true {
+            set_fullscreen(&mut be.canvas, be.fullscreen);
+            be.fullscreen = !be.fullscreen;
+        }
+    }
+}
+
+struct Sdl3Backend {
     canvas: Canvas<Window>,
     texture: Texture,
     event_pump: EventPump,
@@ -28,102 +47,7 @@ pub struct RenderContext {
     input_monitoring: RwLock<InputMonitoring>,
 }
 
-impl RenderContext {
-    pub fn init(width: usize, height: usize, builder: VGABuilder) -> Result<RenderContext, String> {
-        let sdl = sdl3::init().map_err(|e| e.to_string())?;
-
-        let vid = sdl.video().map_err(|e| e.to_string())?;
-        let event_pump = sdl.event_pump().map_err(|e| e.to_string())?;
-
-        let mut window_builder = vid.window(&builder.title, width as u32, height as u32);
-        window_builder.position_centered();
-        if builder.fullscreen {
-            window_builder.fullscreen();
-        }
-
-        let window = window_builder.build().map_err(|e| e.to_string())?;
-        let mut canvas = window.into_canvas();
-        // the logical size is important for fullscreen upscaling
-        canvas
-            .set_logical_size(
-                width as u32,
-                height as u32,
-                SDL_RendererLogicalPresentation::LETTERBOX,
-            )
-            .map_err(|e| e.to_string())?;
-
-        let texture_builder = canvas.texture_creator();
-        let texture = texture_builder
-            .create_texture_streaming(
-                unsafe { PixelFormat::from_ll(SDL_PixelFormat::RGB24) },
-                width as u32,
-                height as u32,
-            )
-            .map_err(|e| e.to_string())?;
-
-        Ok(RenderContext {
-            canvas,
-            texture,
-            event_pump,
-            height,
-            fullscreen: builder.fullscreen,
-            simulate_vertical_reset: builder.simulate_vertical_reset,
-            input_monitoring: RwLock::new(InputMonitoring::new()),
-        })
-    }
-
-    pub fn draw_frame(&mut self, vga: &mut VGAEmu) -> bool {
-        let offset_delta = vga.regs.get_crt_data(CRTReg::Offset) as usize;
-        if offset_delta == 0 {
-            panic!("illegal CRT offset: {}", offset_delta);
-        }
-
-        let vmode = vga.regs.get_video_mode();
-        let linear = is_linear(vmode);
-        //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
-        //but I haven't figured out how yet
-        let v_stretch = if vmode == 0x13 { 2 } else { 1 };
-        let mem_offset = vga.mem_offset();
-
-        set_de(vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
-        self.texture
-            .with_lock(None, |buffer: &mut [u8], pitch: usize| {
-                if linear {
-                    render_linear(
-                        vga,
-                        mem_offset,
-                        offset_delta,
-                        self.height,
-                        v_stretch,
-                        buffer,
-                    );
-                } else {
-                    render_planar(vga, mem_offset, offset_delta, self.height, buffer, pitch);
-                }
-            })
-            .expect("SDL texture lock");
-
-        self.canvas.clear();
-        self.canvas.copy(&self.texture, None, None).expect("copy");
-        self.canvas.present();
-        set_de(vga, false);
-
-        let (emu_input, quit) = self.handle_keys();
-        if quit {
-            return true;
-        }
-
-        if self.simulate_vertical_reset {
-            set_vr(vga, true);
-            sleep(Duration::from_micros(VERTICAL_RESET_MICRO));
-            set_vr(vga, false);
-        }
-
-        self.toggle_fullscreen(&emu_input);
-
-        false
-    }
-
+impl Sdl3Backend {
     pub fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
         self.input_monitoring
             .write()
@@ -168,27 +92,6 @@ impl RenderContext {
         (emu_input, false)
     }
 
-    fn toggle_fullscreen(&mut self, emu_input: &EmuInput) {
-        if emu_input.alt == true && emu_input.f == true {
-            self.set_fullscreen(self.fullscreen);
-            self.fullscreen = !self.fullscreen;
-        }
-    }
-
-    pub fn set_fullscreen(&mut self, fullscreen: bool) {
-        if fullscreen == false {
-            let result = self.canvas.window_mut().set_fullscreen(true);
-            if result.is_err() {
-                println!("error enabling fullscreen: {:?}", result.err());
-            }
-        } else {
-            let result = self.canvas.window_mut().set_fullscreen(false);
-            if result.is_err() {
-                println!("error disabling fullscreen: {:?}", result.err());
-            }
-        }
-    }
-
     fn update_inputs(&mut self, event: Event) {
         match event {
             Event::KeyUp { keycode, .. } => self.clear_key(keycode),
@@ -229,13 +132,116 @@ impl RenderContext {
     }
 }
 
-impl PixelBuffer for [u8] {
-    // TODO Use dedicated SDLBuffer here instead of [u8]
-    const PIXEL_WIDTH: usize = 3;
-    fn set_rgb(&mut self, offset: usize, r: u8, g: u8, b: u8) {
-        self[offset] = r;
-        self[offset + 1] = g;
-        self[offset + 2] = b;
+pub fn set_fullscreen(canvas: &mut Canvas<Window>, fullscreen: bool) {
+    if fullscreen == false {
+        let result = canvas.window_mut().set_fullscreen(true);
+        if result.is_err() {
+            println!("error enabling fullscreen: {:?}", result.err());
+        }
+    } else {
+        let result = canvas.window_mut().set_fullscreen(false);
+        if result.is_err() {
+            println!("error disabling fullscreen: {:?}", result.err());
+        }
+    }
+}
+
+impl RenderBackend for Sdl3RenderBackend {
+    fn init(&mut self, width: usize, height: usize, builder: &VGABuilder) -> Result<(), String> {
+        let sdl = sdl3::init().map_err(|e| e.to_string())?;
+
+        let vid = sdl.video().map_err(|e| e.to_string())?;
+        let event_pump = sdl.event_pump().map_err(|e| e.to_string())?;
+
+        let mut window_builder = vid.window(&builder.title, width as u32, height as u32);
+        window_builder.position_centered();
+        if builder.fullscreen {
+            window_builder.fullscreen();
+        }
+
+        let window = window_builder.build().map_err(|e| e.to_string())?;
+        let mut canvas = window.into_canvas();
+        // the logical size is important for fullscreen upscaling
+        canvas
+            .set_logical_size(
+                width as u32,
+                height as u32,
+                SDL_RendererLogicalPresentation::LETTERBOX,
+            )
+            .map_err(|e| e.to_string())?;
+
+        let texture_builder = canvas.texture_creator();
+        let texture = texture_builder
+            .create_texture_streaming(
+                unsafe { PixelFormat::from_ll(SDL_PixelFormat::RGB24) },
+                width as u32,
+                height as u32,
+            )
+            .map_err(|e| e.to_string())?;
+
+        self.backend = Some(Sdl3Backend {
+            canvas,
+            texture,
+            event_pump,
+            height,
+            fullscreen: builder.fullscreen,
+            simulate_vertical_reset: builder.simulate_vertical_reset,
+            input_monitoring: RwLock::new(InputMonitoring::new()),
+        });
+
+        Ok(())
+    }
+
+    fn draw_frame(&mut self, vga: &mut VGAEmu) -> bool {
+        let offset_delta = vga.regs.get_crt_data(CRTReg::Offset) as usize;
+        if offset_delta == 0 {
+            panic!("illegal CRT offset: {}", offset_delta);
+        }
+
+        let vmode = vga.regs.get_video_mode();
+        let linear = is_linear(vmode);
+        //TODO: inaccurate and currently a hack. This must be somehow inferred from the register states
+        //but I haven't figured out how yet
+        let v_stretch = if vmode == 0x13 { 2 } else { 1 };
+        let mem_offset = vga.mem_offset();
+
+        let be = self.backend.as_mut().expect("init");
+
+        set_de(vga, true); //display enable is currently only set for whole frame (not toggled for horizontal retrace)
+        be.texture
+            .with_lock(None, |buffer: &mut [u8], pitch: usize| {
+                if linear {
+                    render_linear(vga, mem_offset, offset_delta, be.height, v_stretch, buffer);
+                } else {
+                    render_planar(vga, mem_offset, offset_delta, be.height, buffer, pitch);
+                }
+            })
+            .expect("SDL texture lock");
+
+        be.canvas.clear();
+        be.canvas.copy(&be.texture, None, None).expect("copy");
+        be.canvas.present();
+        set_de(vga, false);
+
+        let (emu_input, quit) = be.handle_keys();
+        if quit {
+            return true;
+        }
+
+        if be.simulate_vertical_reset {
+            set_vr(vga, true);
+            sleep(Duration::from_micros(VERTICAL_RESET_MICRO));
+            set_vr(vga, false);
+        }
+
+        self.toggle_fullscreen(&emu_input);
+
+        false
+    }
+
+    fn input_monitoring<'a>(&'a mut self) -> RwLockWriteGuard<'a, InputMonitoring> {
+        let be = self.backend.as_mut().expect("init");
+        be.input_monitoring()
     }
 }
 
