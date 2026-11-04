@@ -63,11 +63,8 @@ jobs:
           echo "PKG_CONFIG_PATH=$GITHUB_WORKSPACE/SDL3/install/lib/pkgconfig:$PKG_CONFIG_PATH" >> $GITHUB_ENV
           echo "C_INCLUDE_PATH=$GITHUB_WORKSPACE/SDL3/install/include:$C_INCLUDE_PATH" >> $GITHUB_ENV
 
-      - name: Build web
-        run: just build-web
-
-      - name: Build sdl
-        run: just build-sdl
+      - name: Build all
+        run: just build-all
 
       - name: Build examples
         run: just build-examples

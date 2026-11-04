@@ -37,21 +37,21 @@ tracing = ["dep:tracing"]
 
 [dependencies]
 # feature "egui"
-eframe = { version = "0.36.2", optional = true }
-egui = { version = "0.36.2", optional = true }
+eframe = { version = "0.37.0", optional = true }
+egui = { version = "0.37.0", optional = true }
 
 # feature "sdl3"
-sdl3 = { version = "0.16.2", optional = true, features = ["unsafe_textures"] }
-tokio = { version = "1.48.0", optional = true, features = ["time", "rt"] }
+sdl3 = { version = "0.22.0", optional = true, features = ["unsafe_textures"] }
+tokio = { version = "1.51.1", optional = true, features = ["time", "rt"] }
 
 #feature "sdl2"
 sdl2 = { version = "0.38.0", optional = true, default-features = false, features = ["unsafe_textures"]}
 
 # feature "web"
-wasm-bindgen = { version = "0.2.105", optional = true }
-wasm-bindgen-futures = { version = "0.4.55", optional = true }
-js-sys = { version = "0.3.82", optional = true }
-web-sys = { version = "0.3.82", optional = true, features = [
+wasm-bindgen = { version = "0.2.130", optional = true }
+wasm-bindgen-futures = { version = "0.4.80", optional = true }
+js-sys = { version = "0.3.107", optional = true }
+web-sys = { version = "0.3.107", optional = true, features = [
     'Document',
     'Window',
     'CanvasRenderingContext2d',

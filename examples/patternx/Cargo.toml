@@ -36,8 +36,8 @@ all = ["sdl3", "sdl2", "web"]
 vga-emu = { path = "../../" }
 
 # feature web
-wasm-bindgen = { version = "0.2.101", optional = true }
-wasm-bindgen-futures = { version = "0.4.53", optional = true }
+wasm-bindgen = { version = "0.2.130", optional = true }
+wasm-bindgen-futures = { version = "0.4.80", optional = true }
 console_error_panic_hook = { version = "0.1.7", optional = true }
-web-sys = { version = "0.3.78", optional = true, features = ['console'] }
-js-sys = { version = "0.3.77", optional = true}
+web-sys = { version = "0.3.107", optional = true, features = ['console'] }
+js-sys = { version = "0.3.107", optional = true }
