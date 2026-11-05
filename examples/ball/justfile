@@ -1,5 +1,9 @@
+
 build-web:
 	wasm-pack build --debug --target web --features web
+
+build-egui:
+    cargo build --features egui
 
 build-sdl3:
     cargo build --features sdl3
@@ -12,6 +16,9 @@ build-all:
 
 run-web: build-web
 	miniserve ./
+
+run-egui:
+	cargo run --features egui -- egui
 
 run-sdl3:
 	cargo run --features sdl3 -- sdl3

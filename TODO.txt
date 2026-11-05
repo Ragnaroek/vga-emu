@@ -1,5 +1,7 @@
 CURR:
-- Remove tracing feature
+==> CURR: add egui to all examples!
+==> ! ball example with animation broken => why?
 
-- implement Egui backend!!
+=> NEXT: full impl of egui keymapping for InputMonitoring
+
 - update iron-wolf with new version

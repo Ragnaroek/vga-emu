@@ -1,6 +1,8 @@
 #[cfg(feature = "web")]
 pub mod web;
 
+#[cfg(feature = "egui")]
+use vga::backend_egui::EguiRenderBackend;
 #[cfg(feature = "sdl2")]
 use vga::backend_sdl2::Sdl2RenderBackend;
 #[cfg(feature = "sdl3")]
@@ -21,8 +23,13 @@ pub async fn start_rectx(arg: String) -> Result<(), String> {
         .fullscreen(false);
 
     match arg.as_str() {
+        #[cfg(feature = "egui")]
+        "egui" | "" => run_rectx(builder.build(EguiRenderBackend::new())?).await,
+        #[cfg(not(feature = "egui"))]
+        "egui" => return Err("egui backend not available (build with --features egui)".to_string()),
+
         #[cfg(feature = "sdl3")]
-        "sdl3" | "" => run_rectx(builder.build(Sdl3RenderBackend::new())?).await,
+        "sdl3" => run_rectx(builder.build(Sdl3RenderBackend::new())?).await,
         #[cfg(not(feature = "sdl3"))]
         "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
 
