@@ -1,8 +1,4 @@
 // Provides various utils for implementing something with the VGA
-
-#[cfg(feature = "tracing")]
-use tracing::instrument;
-
 use crate::{CRTReg, GeneralReg, RenderBackend, VGARegs};
 use crate::{GCReg, PLANE_SIZE, SCReg, VGA, VGAEmu};
 

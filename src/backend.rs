@@ -1,6 +1,3 @@
-#[cfg(feature = "tracing")]
-use tracing::instrument;
-
 /// Contains common functionality shared across all backend implementations
 use crate::{AttributeReg, CRTReg, VGAEmu};
 
@@ -51,7 +48,6 @@ impl PixelBuffer for [u8] {
 }
 
 /// pitch = length of one row in bytes
-#[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_planar<T: PixelBuffer + ?Sized>(
     vga: &mut VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, buffer: &mut T,
     pitch: usize,
@@ -97,7 +93,6 @@ pub fn render_planar<T: PixelBuffer + ?Sized>(
     }
 }
 
-#[cfg_attr(feature = "tracing", instrument(skip_all))]
 pub fn render_linear<T: PixelBuffer + ?Sized>(
     vga: &VGAEmu, mem_offset_p: usize, offset_delta: usize, h: usize, v_stretch: usize,
     buffer: &mut T,

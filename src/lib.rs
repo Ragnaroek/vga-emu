@@ -14,9 +14,6 @@ pub mod backend_web;
 pub mod input;
 pub mod util;
 
-#[cfg(feature = "tracing")]
-use tracing::instrument;
-
 use std::sync::RwLockWriteGuard;
 
 use input::InputMonitoring;
@@ -281,7 +278,6 @@ impl<R: RenderBackend> VGA<R> {
         self.vga_emu.regs.get_gc_data(reg)
     }
 
-    #[cfg_attr(feature = "tracing", instrument(skip_all))]
     pub fn set_crt_data(&mut self, reg: CRTReg, v: u8) {
         self.vga_emu.regs.set_crt_data(reg, v);
     }
