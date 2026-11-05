@@ -4,14 +4,16 @@ pub mod web;
 use std::env;
 use std::fs;
 
-use vga::RenderBackend;
-use vga::VGA;
+#[cfg(feature = "egui")]
+use vga::backend_egui::EguiRenderBackend;
 #[cfg(feature = "sdl2")]
 use vga::backend_sdl2::Sdl2RenderBackend;
 #[cfg(feature = "sdl3")]
 use vga::backend_sdl3::Sdl3RenderBackend;
 #[cfg(feature = "web")]
 use vga::backend_web::WebCanvasRenderBackend;
+
+use vga::{RenderBackend, VGA};
 use vga::util::{self, sleep};
 use vga::{ColorReg, SCReg, VGABuilder};
 
@@ -27,8 +29,13 @@ pub async fn start_palette(arg: String) -> Result<(), String> {
         .title(format!("VGA Palette Example ({})", arg));
 
     match arg.as_str() {
+        #[cfg(feature = "egui")]
+        "egui" | "" => run_palette(builder.build(EguiRenderBackend::new())?).await,
+        #[cfg(not(feature = "egui"))]
+        "egui" => return Err("egui backend not available (build with --features egui)".to_string()),
+
         #[cfg(feature = "sdl3")]
-        "sdl3" | "" => run_palette(builder.build(Sdl3RenderBackend::new())?).await,
+        "sdl3" => run_palette(builder.build(Sdl3RenderBackend::new())?).await,
         #[cfg(not(feature = "sdl3"))]
         "sdl3" => return Err("sdl3 backend not available (build with --features sdl3)".to_string()),
 

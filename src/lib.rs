@@ -3,6 +3,8 @@
 mod lib_test;
 
 pub mod backend;
+#[cfg(feature = "egui")]
+pub mod backend_egui;
 #[cfg(feature = "sdl2")]
 pub mod backend_sdl2;
 #[cfg(feature = "sdl3")]

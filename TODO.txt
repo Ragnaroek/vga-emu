@@ -1,5 +1,3 @@
 CURR:
-- Remove tracing feature
-
-- implement Egui backend!!
-- update iron-wolf with new version
+- update iron-wolf with new version and make egui default there
+=> NEXT: full impl of egui keymapping for InputMonitoring
