@@ -9,7 +9,7 @@ pub mod backend_egui;
 pub mod backend_sdl2;
 #[cfg(feature = "sdl3")]
 pub mod backend_sdl3;
-#[cfg(feature = "test")]
+#[cfg(test)]
 pub mod backend_test;
 #[cfg(feature = "web")]
 pub mod backend_web;

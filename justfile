@@ -11,9 +11,6 @@ build-sdl3:
 build-sdl2:
 	cargo build --features sdl2
 
-build-sdl-tracing:
-	cargo build --release --features sdl,tracing
-
 build-examples:
 	cd examples/ball && just build-all
 	cd examples/palette && just build-all
@@ -25,7 +22,7 @@ build-examples:
 build-all: build-egui build-sdl3 build-sdl2 build-web build-examples
 
 test: build-all
-    cargo test --features test
+    cargo test --all-features
 
 publish:
-	cargo publish --features sdl
+	cargo publish --all-features

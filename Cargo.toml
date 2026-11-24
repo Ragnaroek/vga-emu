@@ -32,8 +32,10 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
-test = ["dep:tokio"]
-all = ["egui", "sdl2", "sdl3", "web", "test"]
+all = ["egui", "sdl2", "sdl3", "web"]
+
+[dev-dependencies]
+tokio = { version = "1.51.1", features = ["full"] }
 
 [dependencies]
 # feature "egui"
