@@ -9,7 +9,7 @@ pub mod backend_egui;
 pub mod backend_sdl2;
 #[cfg(feature = "sdl3")]
 pub mod backend_sdl3;
-#[cfg(test)]
+#[cfg(feature = "test-vga")]
 pub mod backend_test;
 #[cfg(feature = "web")]
 pub mod backend_web;
@@ -448,7 +448,11 @@ impl VGAEmu {
             0x0F
         } else if mem_mode & 0x04 == 0 {
             //odd/even enabled, determine plane on odd/even address
-            if offset % 2 == 0 { 0x05 } else { 0x0A }
+            if offset % 2 == 0 {
+                0x05
+            } else {
+                0x0A
+            }
         } else {
             self.regs.get_sc_data(SCReg::MapMask)
         };

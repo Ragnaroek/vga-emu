@@ -32,7 +32,13 @@ web = [
     "dep:web-sys",
     "dep:js-sys",
 ]
-all = ["egui", "sdl2", "sdl3", "web"]
+test-vga = [
+    "sdl2",
+    "tokio/rt-multi-thread",
+    "tokio/test-util",
+    "tokio/macros",
+]
+all = ["egui", "sdl2", "sdl3", "web", "test-vga"]
 
 [dev-dependencies]
 tokio = { version = "1.51.1", features = ["full"] }

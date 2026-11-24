@@ -22,7 +22,7 @@ build-examples:
 build-all: build-egui build-sdl3 build-sdl2 build-web build-examples
 
 test: build-all
-    cargo test --all-features
+    cargo test --features test-vga
 
 publish:
 	cargo publish --all-features
